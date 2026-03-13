@@ -1,0 +1,97 @@
+name: Build Executables
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+
+    - name: Build macOS app
+      run: |
+        pyinstaller --onefile --name ChooseLife --add-data "bgm.wav:." choose_life_gui.py
+
+    - name: Create macOS app bundle
+      run: |
+        mkdir -p dist/ChooseLife.app/Contents/MacOS
+        mkdir -p dist/ChooseLife.app/Contents/Resources
+        cp dist/ChooseLife dist/ChooseLife.app/Contents/MacOS/
+        cp bgm.wav dist/ChooseLife.app/Contents/Resources/
+
+        cat > dist/ChooseLife.app/Contents/Info.plist << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>ChooseLife</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.chooselife.app</string>
+            <key>CFBundleName</key>
+            <string>ChooseLife</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+            <key>NSPrincipalClass</key>
+            <string>NSApplication</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+
+        chmod +x dist/ChooseLife.app/Contents/MacOS/ChooseLife
+
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ChooseLife-macOS
+        path: dist/ChooseLife.app
+        retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+
+    - name: Build Windows exe
+      run: |
+        pyinstaller --onefile --name ChooseLife --add-data "bgm.wav;." choose_life_gui.py
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ChooseLife-Windows
+        path: dist/ChooseLife.exe
+        retention-days: 30
