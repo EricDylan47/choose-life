@@ -107,6 +107,24 @@ ALL_ACTIONS = [
     ("偷酒吧的酒", "steal_bar_liquor"),
     ("和Spud玩纸牌", "spud_cards"),
     ("去当铺典当", "pawnshop"),
+    # 新增剧情分支
+    ("去诊所看医生", "see_doctor"),
+    ("在公园遇到流浪歌手", "meet_busker"),
+    ("接神秘电话", "mysterious_call"),
+    ("参加互助会", "support_group"),
+    ("偷看Diane的社交账号", "stalk_diane_social"),
+    ("尝试向Sick Boy进货", "buy_from_sick_boy"),
+    ("在医院急诊室", "emergency_room"),
+    ("遇到传教士", "meet_preacher"),
+    ("在码头吹风", "pier_contemplation"),
+    ("偷流浪猫的猫粮", "steal_cat_food"),
+    ("和毒贩做交易", "dealer_transaction"),
+    ("参加地下拳击", "underground_boxing"),
+    ("在图书馆撩志愿者", "library_romance"),
+    ("接私活当打手", "hitman_job"),
+    ("在教堂偷奉献箱", "steal_offering"),
+    ("遇到旧相识", "meet_old_friend"),
+    ("尝试网络诈骗", "online_scam"),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -279,6 +297,92 @@ CHOICE_RESULTS = {
     "pawnshop": [
         ("你走进当铺...", "清醒度-5", "money", 0),  # 将触发小游戏
     ],
+    # 新增剧情分支的结果
+    "see_doctor": [
+        ("医生给你做了检查，摇头叹气...", "清醒度+20", "money", -10),
+        ("护士帮你量了血压，说你活不久了...", "清醒度+10", "money", -5),
+        ("医生开了点药，免费的...", "清醒度+15", "money", 0),
+    ],
+    "meet_busker": [
+        ("流浪歌手给你唱了一首伤感的歌，你听入了迷...", "清醒度+10", "money", 0),
+        ("你给了歌手£5，他教你弹吉他...", "清醒度+15", "money", -5),
+        ("歌手看你可怜，给你£5...", "清醒度+5", "money", 5),
+    ],
+    "mysterious_call": [
+        ("电话那头传来熟悉的声音: '我知道你的秘密...' - 你吓出一身冷汗", "焦虑+20", "money", 0),
+        ("一个陌生女人哭着说打错了...", "清醒度-5", "money", 0),
+        ("沉默...然后挂断了。你彻夜难眠...", "焦虑+15", "清醒度-10", 0),
+    ],
+    "support_group": [
+        ("你参加了戒毒互助会，大家分享着自己的故事...", "清醒度+20", "信誉+10", 0),
+        ("你听到别人的悲惨故事，觉得自己还算幸运...", "清醒度+15", "绝望-10", 0),
+        ("有人对你指指点点，你愤怒离场...", "清醒度-10", "信誉-15", 0),
+    ],
+    "stalk_diane_social": [
+        ("Diane有了新男友，看起来很幸福...", "绝望+25", "清醒度-15", 0),
+        ("Diane发了很多emo动态，你们曾经那么美好...", "绝望+15", "焦虑+10", 0),
+        ("她的生活跟你完全无关了...", "清醒度-5", "绝望+10", 0),
+    ],
+    "buy_from_sick_boy": [
+        ("Sick Boy给你介绍了'好货'...", "戒断值-30", "money", -40),
+        ("你买了假货，被坑了£30...", "戒断值+10", "money", -30),
+        ("Sick Boy说最近缺货，让你等几天...", "戒断值+15", "money", 0),
+    ],
+    "emergency_room": [
+        ("急诊室医生救了你一命...", "清醒度+30", "money", -50),
+        ("护士帮你包扎了伤口...", "清醒度+10", "money", -20),
+        ("你只是喝多了，被赶了出来...", "清醒度-15", "money", -5),
+    ],
+    "meet_preacher": [
+        ("传教士试图拯救你的灵魂...", "清醒度+10", "money", -5),
+        ("你把传教士骂走了...", "清醒度-10", "信誉-5", 0),
+        ("传教士给了你一点钱买吃的...", "清醒度+5", "money", 10),
+    ],
+    "pier_contemplation": [
+        ("海风吹拂，你想起曾经美好的日子...", "清醒度+15", "绝望-10", 0),
+        ("你看到一艘船驶过，梦想着离开这里...", "清醒度+10", "焦虑+5", 0),
+        ("一个老头给你讲了他的人生故事...", "清醒度+5", "绝望-5", 0),
+    ],
+    "steal_cat_food": [
+        ("你偷了流浪猫的猫粮，至少能充饥...", "清醒度+5", "money", 0),
+        ("猫抓了你一下，你感染了...", "清醒度-10", "money", -10),
+        ("猫粮难吃得要命，但你别无选择...", "清醒度+5", "绝望+5", 0),
+    ],
+    "dealer_transaction": [
+        ("你和毒贩交易，被警察看到了!", "戒断值-25", "money", -50),
+        ("毒贩看你可怜，赊了你一点...", "戒断值-20", "money", -10),
+        ("交易顺利，你拿到了货...", "戒断值-30", "money", -35),
+    ],
+    "underground_boxing": [
+        ("你被打得鼻青脸肿，但赢了£50!", "清醒度-20", "money", 50),
+        ("你被打趴下了，医药费花了£30...", "清醒度-25", "money", -30),
+        ("你打赢了对手，赢得了尊重!", "清醒度-15", "money", 80, "信誉", 15),
+    ],
+    "library_romance": [
+        ("你和志愿者聊了起来，感觉还不错...", "清醒度+15", "绝望-10", 0),
+        ("她对你没兴趣，礼貌地走开了...", "清醒度-5", "绝望+5", 0),
+        ("你们交换了联系方式...", "清醒度+10", "焦虑-5", 0),
+    ],
+    "hitman_job": [
+        ("你接了私活，成功完成了任务，得到£100!", "money", 100, "信誉", 20),
+        ("任务失败，你被打了一顿...", "清醒度-30", "money", -20),
+        ("你临阵退缩了，太危险了...", "信誉-10", "money", 0),
+    ],
+    "steal_offering": [
+        ("你偷了奉献箱里的钱£20...", "money", 20, "信誉", -25),
+        ("被抓住了! 神父报警了...", "money", 0, "信誉", -40),
+        ("你良心不安，把钱放了回去...", "信誉+5", "清醒度+10", 0),
+    ],
+    "meet_old_friend": [
+        ("你遇到了的老同学，他现在混得很好...", "绝望+20", "清醒度-10", 0),
+        ("老朋友请了你一顿饭，聊了很多...", "清醒度+10", "money", 15),
+        ("他答应帮你找工作...", "清醒度+15", "信誉+10", 0),
+    ],
+    "online_scam": [
+        ("你骗到了£30! 但良心不安...", "money", 30, "焦虑+15", 0),
+        ("你被对方反套路了亏了£20...", "money", -20, "焦虑+10", 0),
+        ("你成功骗了一笔大的£100!", "money", 100, "信誉", -20),
+    ],
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -300,6 +404,17 @@ BASIC_EVENTS = [
     ("门缝底下塞进来一张水电费账单...", "清醒度-10"),
     ("一只蟑螂从你面前大摇大摆地爬过，像是这里的主人...", "清醒度-5"),
     ("你想上厕所，却发现马桶堵了...", "清醒度-10"),
+    # 新增事件
+    ("一个推销员敲门，向你推销根本不存在的保健品...", "清醒度-5", "money", -5),
+    ("电视里在播戒毒公益广告，你换了个频道...", "清醒度-10"),
+    ("邮箱里有一封给你的信，是法院的传票...", "清醒度-15", "焦虑+10"),
+    ("你在垃圾堆里翻到一台还能用的旧手机!", "清醒度+5", "money", 0),
+    ("房东说要涨房租了...", "清醒度-10", "money", -10),
+    ("一只鸽子飞到窗台上盯着你...", "清醒度-5"),
+    ("你听到隔壁传来欢笑声，那是你曾经的生活...", "清醒度-10"),
+    ("止痛药过期了，你犹豫了一下还是吃了...", "清醒度-15"),
+    ("有人在你门口放了一束花，不知道是谁...", "清醒度+10"),
+    ("手机收到一条诈骗短信说你中奖了...", "清醒度-5"),
 ]
 
 HEAVY_EVENTS = [
@@ -318,6 +433,15 @@ HEAVY_EVENTS = [
     ("你的电脑中毒了，所有照片和文件都化为乌有...", "清醒度-20"),
     ("你在酒吧看到Diane挽着另一个男人的手...", "清醒度-25"),
     ("你的债主找上门来，你从窗户逃走了...", "清醒度-30", "money", -25),
+    # 新增重型事件
+    ("你在医院醒来，完全不记得发生了什么...", "清醒度-30", "money", -40),
+    ("高利贷找上门来，你的一条腿可能保不住了...", "清醒度-35", "money", -60),
+    ("你唯一的朋友Spud死了， overdose...", "清醒度-40", "绝望+20", 0),
+    ("你在警局过夜，被当成嫌疑人审讯了12小时...", "清醒度-25", "信誉-15", 0),
+    ("你发现自己染上了HIV...", "清醒度-40", "绝望+30", 0),
+    ("你的房子着火了，所有东西都烧光了...", "清醒度-35", "money", -80),
+    ("你被绑架了，醒来时在一个废弃仓库里...", "清醒度-40", "money", -30),
+    ("你在网吧晕倒，被送到医院急救...", "清醒度-30", "money", -50),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -343,9 +467,13 @@ class ChooseLifeGame:
     def __init__(self, root):
         self.root = root
         self.root.title("CHOOSE LIFE - 人生选择模拟器")
-        self.root.geometry("1100x1000")
+        self.root.geometry("1200x900")
         self.root.configure(bg=BG_DARK)
         self.root.bind('<Key>', self.handle_keypress)
+        self.root.bind('<Return>', self.handle_keypress)
+        self.root.bind('<space>', lambda e: self.next_round() if self.continue_btn['state'] == 'normal' and not self.game_over else None)
+        self.root.bind('<Button-1>', self.on_click)
+        self.root.focus_force()
 
         self.player = HumanTrash()
         self.displayed_actions = []
@@ -491,26 +619,28 @@ class ChooseLifeGame:
         self.hint_label.pack()
 
         self.options_frame = tk.Frame(self.root, bg=BG_DARK)
-        self.options_frame.pack(pady=10)
+        self.options_frame.pack(pady=5)
 
         self.option_buttons = []
         for i in range(6):
             btn = tk.Button(self.options_frame, text=f"[{i+1}] ",
-                           font=("Courier", 11), fg="#FFA500", bg="#1A1A1A",
-                           width=50, height=1, anchor="w",
+                           font=("Courier", 10), fg="#FFA500", bg="#1A1A1A",
+                           width=35, height=1, anchor="w",
                            command=lambda idx=i: self.make_choice(idx))
-            btn.pack(pady=2)
+            btn.pack(pady=1, fill="x")
             self.option_buttons.append(btn)
 
+        # 结果文本区域 - 不自动换行，水平滚动
         self.result_label = tk.Label(self.root, text="",
-                                     fg="#FFA500", bg=BG_DARK, wraplength=1000,
-                                     justify="left", height=12)
-        self.result_label.pack(pady=5, fill="both", padx=20, expand=True)
+                                     fg="#FFA500", bg=BG_DARK,
+                                     font=("Courier", 11), justify="left", anchor="nw")
+        self.result_label.pack(pady=5, fill="both", padx=10, expand=True)
 
+        # 事件文本区域
         self.event_label = tk.Label(self.root, text="",
-                                    fg="#FFA500", bg=BG_DARK, wraplength=1000,
-                                    justify="left", height=8)
-        self.event_label.pack(pady=5, fill="both", padx=20, expand=True)
+                                    fg="#FFA500", bg=BG_DARK,
+                                    font=("Courier", 10), justify="left", anchor="nw")
+        self.event_label.pack(pady=5, fill="both", padx=10, expand=True)
 
         control_frame = tk.Frame(self.root, bg=BG_DARK)
         control_frame.pack(pady=10)
@@ -521,9 +651,9 @@ class ChooseLifeGame:
         self.music_btn.pack(side="left", padx=5)
         self.music_on = True
 
-        self.continue_btn = tk.Button(control_frame, text="继续 >>",
-                                       font=("Courier", 12, "bold"), fg=RED, bg=DARK_RED,
-                                       command=self.next_round, state="disabled", width=20, height=2)
+        self.continue_btn = tk.Button(control_frame, text="【按回车继续】",
+                                       font=("Courier", 14, "bold"), fg="white", bg="#8B0000",
+                                       command=self.next_round, state="disabled", width=25, height=2)
         self.continue_btn.pack(side="left", padx=5)
 
     def toggle_music(self):
@@ -537,6 +667,7 @@ class ChooseLifeGame:
             self.music_on = True
 
     def handle_keypress(self, event):
+        # 按1-6选择选项
         if event.char in '123456' and not self.game_over:
             try:
                 idx = int(event.char) - 1
@@ -545,6 +676,14 @@ class ChooseLifeGame:
                     self.make_choice(idx)
             except (ValueError, IndexError):
                 pass
+        # 按回车或空格继续下一轮
+        elif event.keysym == 'Return' or event.keysym == 'Space' or event.char in ['\r', '\n', ' ']:
+            if self.continue_btn['state'] == 'normal' and not self.game_over:
+                self.next_round()
+
+    def on_click(self, event):
+        """确保点击时窗口获得焦点"""
+        self.root.focus_force()
 
     def start_timer(self):
         self.timer_running = True
@@ -599,6 +738,7 @@ class ChooseLifeGame:
         self.check_rent()
         self.setup_options()
         self.start_timer()
+        self.root.focus_force()
 
     def setup_options(self):
         available_actions = [a for a in ALL_ACTIONS if a[1] not in self.player.history[-3:]]
@@ -662,85 +802,172 @@ class ChooseLifeGame:
         self.despair_value_label.configure(text=str(self.player.despair))
 
     def make_choice(self, idx):
-        if idx >= len(self.displayed_actions):
-            return
-        self.cancel_timer()
-        for btn in self.option_buttons:
-            btn.configure(state="disabled")
+        try:
+            if idx >= len(self.displayed_actions):
+                return
+            self.cancel_timer()
+            for btn in self.option_buttons:
+                btn.configure(state="disabled")
+            self.root.update_idletasks()
 
-        action_name, action_id = self.displayed_actions[idx]
-        self.player.choices_log.append(action_name)
-        self.player.history.append(action_id)
+            action_name, action_id = self.displayed_actions[idx]
+            self.player.choices_log.append(action_name)
+            self.player.history.append(action_id)
 
-        # 特殊互动
-        if action_id == "call_parents":
-            self.handle_call_parents()
-            return
-        if action_id == "text_diane":
-            self.handle_text_diane()
-            return
-        if action_id == "call_sick_boy":
-            self.handle_call_sick_boy()
-            return
-        if action_id == "call_mark":
-            self.handle_call_mark()
-            return
-        if action_id == "contact_renton":
-            self.handle_contact_renton()
-            return
-        if action_id == "dumpster_dive":
-            self.handle_dumpster_dive()
-            return
-        if action_id == "find_job":
-            self.handle_find_job()
-            return
-        if action_id == "begbie_gamble":
-            self.handle_begbie_gamble()
-            return
-        if action_id == "drinking_contest":
-            self.handle_drinking_contest()
-            return
-        if action_id == "steal_bar_liquor":
-            self.handle_steal_bar_liquor()
-            return
-        if action_id == "spud_cards":
-            self.handle_spud_cards()
-            return
-        if action_id == "pawnshop":
-            self.handle_pawnshop()
-            return
+            # 特殊互动
+            if action_id == "call_parents":
+                self.handle_call_parents()
+                return
+            if action_id == "text_diane":
+                self.handle_text_diane()
+                return
+            if action_id == "call_sick_boy":
+                self.handle_call_sick_boy()
+                return
+            if action_id == "call_mark":
+                self.handle_call_mark()
+                return
+            if action_id == "contact_renton":
+                self.handle_contact_renton()
+                return
+            if action_id == "dumpster_dive":
+                self.handle_dumpster_dive()
+                return
+            if action_id == "find_job":
+                self.handle_find_job()
+                return
+            if action_id == "begbie_gamble":
+                self.handle_begbie_gamble()
+                return
+            if action_id == "drinking_contest":
+                self.handle_drinking_contest()
+                return
+            if action_id == "steal_bar_liquor":
+                self.handle_steal_bar_liquor()
+                return
+            if action_id == "spud_cards":
+                self.handle_spud_cards()
+                return
+            if action_id == "pawnshop":
+                self.handle_pawnshop()
+                return
 
-        results = CHOICE_RESULTS.get(action_id, [("你做了点什么...", "清醒度-5", "money", 0)])
-        result_text, stat1, stat2, val = random.choice(results)
+            results = CHOICE_RESULTS.get(action_id, [("你做了点什么...", "清醒度-5", "money", 0)])
+            result = random.choice(results)
 
-        # 记录变化前的现金
-        old_cash = self.player.cash
+            # 解析结果元组 - 支持不同格式
+            # 格式1: (desc, stat1_with_val, stat2_with_val, val2)
+            #   例如: ("描述", "清醒度-15", "money", -5) -> 清醒度-15, money-5
+            # 格式2: (desc, stat1, val1, stat2, val2)
+            #   例如: ("描述", "money", 100, "信誉", 20) -> money+100, 信誉+20
+            result_text = result[0]
 
-        self.result_label.configure(text=f"► 你选择了：{action_name}\n{result_text}")
-        self.apply_effect(stat1, val)
-        if stat2:
-            self.apply_effect(stat2, val)
+            # 记录变化前的现金
+            old_cash = self.player.cash
 
-        # 计算金钱变化
-        money_change = self.player.cash - old_cash
-        if money_change != 0:
-            change_text = f"💰 现金: {'+' if money_change > 0 else ''}{money_change} (现在: £{self.player.cash})"
-            self.result_label.configure(text=self.result_label.cget("text") + f"\n\n{change_text}")
+            # 立即显示结果
+            self.result_label.configure(text=f"► 你选择了：{action_name}\n\n{result_text}")
+            self.root.update_idletasks()
 
-        self.trigger_events()
-        self.update_status()
+            if len(result) == 4:
+                # 格式1: result[1]="清醒度-15", result[2]="money", result[3]=-5
+                stat1 = result[1]
+                stat2 = result[2]
+                val2 = result[3]
 
-        if self.player.reputation < 20:
-            self.event_label.configure(text=self.event_label.cget("text") + "\n⚠️ 信誉太低！所有朋友都背叛了你！")
+                # 解析stat1
+                if stat1 and isinstance(stat1, str):
+                    parsed = self.parse_stat_change(stat1)
+                    if parsed:
+                        self.apply_effect(parsed[0], parsed[1])
 
-        if self.player.sober <= 0:
-            self.show_ending("sober")
-            return
-        if self.player.cash < 0:
-            self.show_ending("debt")
-            return
+                # 解析stat2
+                if stat2 and isinstance(stat2, str):
+                    parsed = self.parse_stat_change(stat2)
+                    if parsed:
+                        self.apply_effect(parsed[0], parsed[1])
+                    elif val2 is not None:
+                        try:
+                            self.apply_effect(stat2, int(val2))
+                        except (ValueError, TypeError):
+                            pass
 
-        self.continue_btn.configure(state="normal")
+            elif len(result) >= 5:
+                # 格式2: result[1]="money", result[2]=100, result[3]="信誉", result[4]=20
+                stat1 = result[1]
+                val1 = result[2]
+                stat2 = result[3] if len(result) > 3 else None
+                val2 = result[4] if len(result) > 4 else None
+
+                # 应用stat1
+                if stat1 and isinstance(stat1, str):
+                    parsed = self.parse_stat_change(stat1)
+                    if parsed:
+                        self.apply_effect(parsed[0], parsed[1])
+                    elif val1 is not None:
+                        try:
+                            self.apply_effect(stat1, int(val1))
+                        except (ValueError, TypeError):
+                            pass
+
+                # 应用stat2
+                if stat2 and isinstance(stat2, str) and val2 is not None:
+                    parsed = self.parse_stat_change(stat2)
+                    if parsed:
+                        self.apply_effect(parsed[0], parsed[1])
+                    else:
+                        try:
+                            self.apply_effect(stat2, int(val2))
+                        except (ValueError, TypeError):
+                            pass
+            else:
+                # 默认效果
+                self.apply_effect("清醒度", -5)
+
+            # 计算金钱变化
+            money_change = self.player.cash - old_cash
+            if money_change != 0:
+                change_text = f"\n\n💰 现金: {'+' if money_change > 0 else ''}{money_change} (现在: £{self.player.cash})"
+                self.result_label.configure(text=self.result_label.cget("text") + change_text)
+
+            self.root.update_idletasks()
+            self.trigger_events()
+            self.update_status()
+
+            if self.player.reputation < 20:
+                self.event_label.configure(text=self.event_label.cget("text") + "\n⚠️ 信誉太低！所有朋友都背叛了你！")
+
+            if self.player.sober <= 0:
+                self.show_ending("sober")
+                return
+            if self.player.cash < 0:
+                self.show_ending("debt")
+                return
+
+            self.continue_btn.configure(state="normal")
+            self.root.update_idletasks()
+            self.root.focus_force()
+        except Exception as e:
+            print(f"Error in make_choice: {e}")
+            import traceback
+            traceback.print_exc()
+            self.result_label.configure(text=f"发生错误: {e}")
+            self.continue_btn.configure(state="normal")
+
+    def parse_stat_change(self, stat_str):
+        """解析形如 '清醒度-15' 或 'money+20' 的字符串"""
+        if not stat_str or not isinstance(stat_str, str):
+            return None
+        # 找到 +/- 的位置
+        for i, char in enumerate(stat_str):
+            if char in '+-':
+                stat_name = stat_str[:i]
+                try:
+                    val = int(stat_str[i:])
+                    return (stat_name, val)
+                except ValueError:
+                    return None
+        return None
 
     def apply_effect(self, stat, val):
         if stat == "money":
@@ -1245,7 +1472,43 @@ class ChooseLifeGame:
             self.show_ending("debt")
             return
 
+        # 新增结局触发条件
+        # 戒断值过高可能导致过量
+        if self.player.withdrawal >= 95 and random.random() < 0.3:
+            self.show_ending("overdose")
+            return
+
+        # 没钱+低清醒度可能入狱
+        if self.player.cash < 10 and self.player.sober < 20 and random.random() < 0.2:
+            self.show_ending("arrest")
+            return
+
+        # 长时间存活可能触发神秘结局
+        if self.player.day > 20 and self.player.round > 50 and random.random() < 0.1:
+            self.show_ending("mysterious")
+            return
+
+        # 高绝望值可能触发特殊结局
+        if self.player.despair >= 95:
+            if random.random() < 0.3:
+                self.show_ending("overdose")
+                return
+
+        # 正面结局触发条件
+        # 高清醒度+高信誉+有钱 = 人生赢家
+        if self.player.sober >= 80 and self.player.reputation >= 70 and self.player.cash >= 200:
+            if random.random() < 0.15:
+                self.show_ending("success")
+                return
+
+        # 戒掉毒瘾 = 救赎
+        if self.player.withdrawal == 0 and self.player.sober >= 60 and self.player.day > 10:
+            if random.random() < 0.1:
+                self.show_ending("redemption")
+                return
+
         self.continue_btn.configure(state="normal")
+        self.root.update_idletasks()  # 强制刷新界面
 
     def next_round(self):
         self.player.withdrawal = min(100, self.player.withdrawal + 5)
@@ -1262,6 +1525,13 @@ class ChooseLifeGame:
             "landlord": ("被赶出门", "房东把你赶出来了！\n\n你连房租都交不起，还谈什么人生？\n\n滚出去喝西北风吧！\n\n——不过想想，你本来就 在喝西北风。"),
             "debt": ("债务爆炸", "你欠了一屁股债！\n\n追债的天天上门，你还能躲去哪？"),
             "sober": ("清醒度归零", "你终于彻底麻木了...\n\n清醒度归零，你活着跟死了有什么区别？\n\n没有。\n\n真的没有。"),
+            # 新增结局
+            "hiv": ("绝望深渊", "你收到了HIV检测结果——阳性。\n\n这个世界在你眼前崩塌。\n\n也许这就是你最后一次放纵的代价。"),
+            "arrest": ("锒铛入狱", "警车带走了你。\n\n在监狱里，你终于有了栖身之地。\n\n只是这代价太大了。"),
+            "overdose": ("过量身亡", "你的人生在那一刻停止了。\n\n也许在某个瞬间，你曾经想要改变。\n\n但现在一切都晚了。"),
+            "redemption": ("自我救赎", "你终于戒掉了毒瘾！\n\n虽然人生已经一团糟，但你决定重新开始。\n\n这是你应得的——一个新的开始。"),
+            "success": ("人生赢家", "你他妈的居然成功了！\n\n找到工作，戒掉毒瘾，还清债务。\n\n在这个操蛋的世界里，你赢了。"),
+            "mysterious": ("神秘消失", "你消失了。\n\n没有人知道你去了哪里。\n\n也许这是最好的结局。"),
         }
 
         title, text = endings.get(reason, endings["normal"])
