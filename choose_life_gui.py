@@ -560,7 +560,9 @@ class ChooseLifeGame:
             self.timer_id = self.root.after(1000, self.update_timer)
         else:
             self.timer_label.configure(text="超时!")
-            self.make_choice(5)
+            # 随机选择一个有效选项
+            idx = random.randint(0, len(self.displayed_actions) - 1) if self.displayed_actions else 0
+            self.make_choice(idx)
 
     def cancel_timer(self):
         self.timer_running = False
