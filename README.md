@@ -76,7 +76,7 @@ pyinstaller --onefile --name ChooseLife --add-data "bgm.wav:." choose_life_gui.p
 
 ## 游戏特色
 
-- 极乐迪斯科风格的阴暗氛围
+- 阴暗氛围
 - 随机事件系统
 - 多种结局走向
 - 动态属性变化
