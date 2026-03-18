@@ -3,7 +3,7 @@
 """
 ================================================================================
 ✞ CHOOSE LIFE = CHOOSE YOUR MISERY ✞
-人生选择模拟器 —— 终极混沌版
+人生选择模拟器 —— 终极混沌版 v2.0
 ================================================================================
 # 清醒度？只是你骗自己还能撑下去的幻觉
 # 信誉？你就是个骗子，别装了
@@ -12,13 +12,15 @@
 """
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, ttk
 import random
 import time
 import threading
 import subprocess
 import os
 import sys
+import json
+from datetime import datetime
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 音乐播放
@@ -53,17 +55,100 @@ class MusicPlayer:
 music_player = MusicPlayer()
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 颜色定义
+# 颜色定义 - 增强版配色方案
 # ═══════════════════════════════════════════════════════════════════════════
 RED = '#FF4444'
 DARK_RED = '#8B0000'
 GRAY = '#808080'
 DARK_GRAY = '#404040'
 BLACK = '#0D0D0D'
-BG_DARK = '#1A1A1A'
-YELLOW = '#FFA500'  # 亮橙色，更醒目
-GREEN = '#00FF00'
-PURPLE = '#9900FF'
+BG_DARK = '#121212'
+BG_MEDIUM = '#1E1E1E'
+BG_LIGHT = '#2D2D2D'
+YELLOW = '#FFD700'
+ORANGE = '#FFA500'
+GREEN = '#00FF7F'
+PURPLE = '#9B59B6'
+CYAN = '#00CED1'
+PINK = '#FF69B4'
+
+# 状态条颜色
+COLORS = {
+    'cash': '#2ECC71',      # 绿色 - 现金
+    'sober': '#3498DB',     # 蓝色 - 清醒度
+    'reputation': '#F39C12', # 橙色 - 信誉
+    'withdrawal': '#9B59B6', # 紫色 - 戒断值
+    'anxiety': '#E74C3C',   # 红色 - 焦虑
+    'despair': '#1ABC9C',   # 青色 - 绝望
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ASCII 艺术
+# ═══════════════════════════════════════════════════════════════════════════
+ASCII_ART = r"""
+    ___    __    ___  _       __   _  _  ____     ____  ___  __  __  ____
+   / __)  /  \  / __)( )     (  ) ( )( )(  _ \   (  _ \(  _)(  )(  )(  _ \
+  ( ( _  (  O )( (__ | |____  )(__  __  (  ) )   )___/ ) _)  )(__  (  ) )
+   \__)  \__/  \___)(______)(______)(_)(__\_)  (__)  (__)   (____)(__\_)
+"""
+
+TITLE_ART = """
+████████╗ ██████╗  ██████╗ ██╗    ██╗███╗   ██╗
+╚══██╔══╝██╔═══██╗██╔══██╗██║    ██║████╗  ██║
+   ██║   ██║   ██║██████╔╝██║ █╗ ██║██╔██╗ ██║
+   ██║   ██║   ██║██╔══██╗██║███╗██║██║╚██╗██║
+   ██║   ╚██████╔╝██║  ██║╚███╔███╔╝██║ ╚████║
+   ╚═╝    ╚═════╝ ╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═══╝
+   ██████╗ ███████╗████████╗██████╗  ██████╗
+   ██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██╔═══██╗
+   ██████╔╝█████╗     ██║   ██████╔╝██║   ██║
+   ██╔══██╗██╔══╝     ██║   ██╔══██╗██║   ██║
+   ██║  ██║███████╗   ██║   ██║  ██║╚██████╔╝
+   ╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝
+"""
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 存档管理
+# ═══════════════════════════════════════════════════════════════════════════
+SAVE_DIR = os.path.expanduser("~/Documents/ChooseLife")
+os.makedirs(SAVE_DIR, exist_ok=True)
+
+def get_save_path(slot):
+    return os.path.join(SAVE_DIR, f"save_{slot}.json")
+
+def save_game(player_data, slot=1):
+    """保存游戏进度"""
+    save_path = get_save_path(slot)
+    try:
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(player_data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"保存失败: {e}")
+        return False
+
+def load_game(slot):
+    """加载游戏进度"""
+    save_path = get_save_path(slot)
+    try:
+        if os.path.exists(save_path):
+            with open(save_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"加载失败: {e}")
+    return None
+
+def get_save_info(slot):
+    """获取存档信息"""
+    save_path = get_save_path(slot)
+    try:
+        if os.path.exists(save_path):
+            with open(save_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return f"第{data.get('day', 0)}天 - {data.get('ending', '未完成')}"
+    except:
+        pass
+    return "空存档"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 动作库
@@ -125,6 +210,22 @@ ALL_ACTIONS = [
     ("在教堂偷奉献箱", "steal_offering"),
     ("遇到旧相识", "meet_old_friend"),
     ("尝试网络诈骗", "online_scam"),
+    # === 新增深度剧情分支 ===
+    ("去心理咨询", "therapy_session"),
+    ("参加瑜伽课程", "yoga_class"),
+    ("写日记记录生活", "journal_writing"),
+    ("深夜电台倾诉", "radio_confession"),
+    ("在雨中漫步", "rain_walk"),
+    ("去动物园看动物", "zoo_visit"),
+    ("尝试冥想", "meditation"),
+    ("给未来的自己写信", "future_letter"),
+    ("在酒吧当临时工", "bar_temp"),
+    ("参加诗歌朗诵会", "poetry_club"),
+    ("学习烹饪", "cooking_class"),
+    ("去旧书店淘宝", "used_bookstore"),
+    ("志愿者活动", "volunteer_work"),
+    ("观看日出", "watch_sunrise"),
+    ("制定人生计划", "life_plan"),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -383,6 +484,82 @@ CHOICE_RESULTS = {
         ("你被对方反套路了亏了£20...", "money", -20, "焦虑+10", 0),
         ("你成功骗了一笔大的£100!", "money", 100, "信誉", -20),
     ],
+    # === 新增深度剧情 ===
+    "therapy_session": [
+        ("心理咨询师认真倾听你的故事，你第一次感到被理解...", "清醒度+25", "焦虑-15"),
+        ("医生给你开了安眠药，免费的...", "清醒度+15", "money", -5),
+        ("你觉得这些都是bullshit，甩门而去...", "清醒度-5", "信誉-10"),
+    ],
+    "yoga_class": [
+        ("跟着老师做瑜伽，身体渐渐放松，脑子也不那么乱了...", "清醒度+20", "焦虑-10"),
+        ("你笨手笨脚地被别人嘲笑，但感觉还不错...", "清醒度+10", "money", -15),
+        ("课后的冥想让你找到了片刻宁静...", "清醒度+15", "绝望-5"),
+    ],
+    "journal_writing": [
+        ("你把所有的痛苦都写了下来，笔尖触及灵魂深处...", "清醒度+15", "焦虑-10"),
+        ("写完后你把这些文字都烧掉了，像是在告别过去...", "清醒度+10", "绝望-5"),
+        ("你的字迹越来越潦草，像是内心的混乱...", "清醒度-5", "焦虑+5"),
+    ],
+    "radio_confession": [
+        ("深夜电台DJ认真听了你的故事，给你点了一首歌...", "清醒度+15", "焦虑-10"),
+        ("主持人说'我们会为你祈祷'，你挂断了电话...", "清醒度+5", "money", 0),
+        ("热线一直占线，你对着忙音说了半小时...", "清醒度+10", "money", 0),
+    ],
+    "rain_walk": [
+        ("雨水打在脸上，你想起童年时的无忧时光...", "清醒度+15", "绝望-10"),
+        ("你淋感冒了，但脑子反而清醒了一些...", "清醒度+10", "money", -5),
+        ("路人都用奇怪的眼神看你，你成了这座城市的笑话...", "清醒度-5", "焦虑+10"),
+    ],
+    "zoo_visit": [
+        ("看到笼子里的狮子，你觉得自己跟它没什么区别...", "清醒度+5", "绝望+5"),
+        ("海狮的表演让你笑了出来，这是今天的第一个笑容...", "清醒度+15", "money", -10),
+        ("动物园的孩子们很开心，你想起了曾经的单纯...", "清醒度+10", "绝望-5"),
+    ],
+    "meditation": [
+        ("闭眼深呼吸，脑子里的噪音渐渐消失...", "清醒度+20", "焦虑-15"),
+        ("你睡着了，醒来时脖子都僵了...", "清醒度+5", "money", 0),
+        ("各种念头纷至沓来，根本无法静心...", "清醒度-5", "焦虑+5"),
+    ],
+    "future_letter": [
+        ("你给五年后的自己写了封信，充满了希望...", "清醒度+15", "绝望-10", 0),
+        ("你不知道该写什么，未来对你来说是一片空白...", "清醒度-5", "绝望+5", 0),
+        ("你把自己骂了一通，这封信读起来像遗书...", "清醒度-10", "绝望+10", 0),
+    ],
+    "bar_temp": [
+        ("你洗了一晚上的杯子，赚了£30...", "money", 30, "清醒度-10"),
+        ("酒吧老板看你可怜，多给了你£10小费...", "money", 40, "信誉+5"),
+        ("你偷看了老板的抽屉，里面有£100...", "money", 100, "信誉-20"),
+    ],
+    "poetry_club": [
+        ("你朗诵了一首自己写的诗，虽然很烂但大家鼓掌了...", "清醒度+15", "信誉+10"),
+        ("其他人都是文学青年，你感觉自己格格不入...", "清醒度-5", "绝望+5", 0),
+        ("你听到一个女孩的诗，听入了迷...", "清醒度+10", "焦虑-5", 0),
+    ],
+    "cooking_class": [
+        ("你学会了做一道简单的菜，成就感油然而生...", "清醒度+15", "money", -20),
+        ("做饭的时候你切到了手，鲜血直流...", "清醒度-10", "money", -10),
+        ("你给自己做了一顿饭，虽然很难吃但至少是热的...", "清醒度+10", "money", -5),
+    ],
+    "used_bookstore": [
+        ("你在旧书堆里找到一本绝版书，卖了£50...", "money", 50, "清醒度+10", 0),
+        ("你翻看一本日记本，发现了一个陌生人的一生...", "清醒度+10", "绝望+5", 0),
+        ("老板看你可怜，送了你几本旧书...", "清醒度+5", "money", 5),
+    ],
+    "volunteer_work": [
+        ("你帮老人打扫房间，他们谢谢你...", "清醒度+15", "信誉+15", 0),
+        ("你累了一天但很开心，感觉自己还有用...", "清醒度+20", "绝望-10", 0),
+        ("组织者说你的精神状态不适合当志愿者...", "清醒度-5", "信誉-10", 0),
+    ],
+    "watch_sunrise": [
+        ("太阳从地平线升起，新的一天开始了...", "清醒度+20", "绝望-10", 0),
+        ("你看着太阳，思考为什么自己还活着...", "清醒度+10", "焦虑+5", 0),
+        ("太冷了，你冻得发抖，但还是看完了...", "清醒度+15", "money", 0),
+    ],
+    "life_plan": [
+        ("你列了满满一张计划表，感觉人生有了方向...", "清醒度+15", "绝望-15", 0),
+        ("写完后你把纸撕了，计划永远是计划...", "清醒度-5", "绝望+10", 0),
+        ("你决定从今天开始改变，哪怕一点点...", "清醒度+10", "信誉+5", 0),
+    ],
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -462,12 +639,47 @@ class HumanTrash:
         self.choices_log = []
         self.history = []
 
+    def to_dict(self):
+        """转换为字典用于存档"""
+        return {
+            'cash': self.cash,
+            'sober': self.sober,
+            'reputation': self.reputation,
+            'withdrawal': self.withdrawal,
+            'anxiety': self.anxiety,
+            'despair': self.despair,
+            'day': self.day,
+            'round': self.round,
+            'hour': self.hour,
+            'rent_due': self.rent_due,
+            'choices_log': self.choices_log,
+            'history': self.history,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """从字典恢复"""
+        player = cls()
+        player.cash = data.get('cash', 50)
+        player.sober = data.get('sober', 60)
+        player.reputation = data.get('reputation', 40)
+        player.withdrawal = data.get('withdrawal', 20)
+        player.anxiety = data.get('anxiety', 90)
+        player.despair = data.get('despair', 50)
+        player.day = data.get('day', 1)
+        player.round = data.get('round', 0)
+        player.hour = data.get('hour', 12)
+        player.rent_due = data.get('rent_due', 6)
+        player.choices_log = data.get('choices_log', [])
+        player.history = data.get('history', [])
+        return player
+
 
 class ChooseLifeGame:
     def __init__(self, root):
         self.root = root
-        self.root.title("CHOOSE LIFE - 人生选择模拟器")
-        self.root.geometry("1200x900")
+        self.root.title("CHOOSE LIFE - 人生选择模拟器 v2.0")
+        self.root.geometry("1300x950")
         self.root.configure(bg=BG_DARK)
         self.root.bind('<Key>', self.handle_keypress)
         self.root.bind('<Return>', self.handle_keypress)
@@ -484,6 +696,7 @@ class ChooseLifeGame:
         self.game_over = False
         self.rent_amount = 40
 
+        self.create_menu()
         self.create_widgets()
         self.start_new_round()
         self.play_background_music()
@@ -505,10 +718,169 @@ class ChooseLifeGame:
                 music_player.play(music_path)
                 break
 
+    def create_menu(self):
+        """创建菜单栏"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # 游戏菜单
+        game_menu = tk.Menu(menubar, tearoff=0, bg=BG_MEDIUM, fg='white')
+        menubar.add_cascade(label="游戏", menu=game_menu, font=("Courier", 10))
+        game_menu.add_command(label="新游戏", command=self.confirm_new_game, font=("Courier", 10))
+        game_menu.add_separator()
+        game_menu.add_command(label="保存游戏 (1)", command=lambda: self.quick_save(1), font=("Courier", 10))
+        game_menu.add_command(label="保存游戏 (2)", command=lambda: self.quick_save(2), font=("Courier", 10))
+        game_menu.add_command(label="保存游戏 (3)", command=lambda: self.quick_save(3), font=("Courier", 10))
+        game_menu.add_separator()
+        game_menu.add_command(label="读取存档 (1)", command=lambda: self.quick_load(1), font=("Courier", 10))
+        game_menu.add_command(label="读取存档 (2)", command=lambda: self.quick_load(2), font=("Courier", 10))
+        game_menu.add_command(label="读取存档 (3)", command=lambda: self.quick_load(3), font=("Courier", 10))
+        game_menu.add_separator()
+        game_menu.add_command(label="退出", command=self.confirm_quit, font=("Courier", 10))
+
+        # 帮助菜单
+        help_menu = tk.Menu(menubar, tearoff=0, bg=BG_MEDIUM, fg='white')
+        menubar.add_cascade(label="帮助", menu=help_menu, font=("Courier", 10))
+        help_menu.add_command(label="游戏说明", command=self.show_help, font=("Courier", 10))
+        help_menu.add_command(label="快捷键", command=self.show_shortcuts, font=("Courier", 10))
+
+    def quick_save(self, slot):
+        """快速保存"""
+        game_data = {
+            'player': self.player.to_dict(),
+            'rent_amount': self.rent_amount,
+            'game_over': self.game_over,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'ending': '游戏中' if not self.game_over else '未知'
+        }
+        if save_game(game_data, slot):
+            messagebox.showinfo("保存成功", f"游戏已保存到存档槽 {slot}")
+
+    def quick_load(self, slot):
+        """快速加载"""
+        data = load_game(slot)
+        if data:
+            self.player = HumanTrash.from_dict(data.get('player', {}))
+            self.rent_amount = data.get('rent_amount', 40)
+            self.game_over = data.get('game_over', False)
+            self.refresh_display()
+            self.setup_options()
+            messagebox.showinfo("加载成功", f"已从存档槽 {slot} 加载游戏")
+        else:
+            messagebox.showwarning("加载失败", f"存档槽 {slot} 为空")
+
+    def confirm_new_game(self):
+        """确认新游戏"""
+        if messagebox.askyesno("新游戏", "当前进度将会丢失，确定要开始新游戏吗？"):
+            self.restart_game()
+
+    def confirm_quit(self):
+        """确认退出"""
+        if messagebox.askyesno("退出", "确定要退出游戏吗？"):
+            self.root.quit()
+
+    def show_help(self):
+        """显示帮助"""
+        help_text = """【CHOOSE LIFE 游戏说明】
+
+目标：在这个世界活下去，或者毁灭。
+
+属性说明：
+- 💰 现金：没有钱你什么都做不了
+- 🧠 清醒度：归零你就完了
+- 👥 信誉：太低没人帮你
+- 💉 戒断值：太高会出问题
+- 😰 焦虑：越高越容易出错
+- 💔 绝望：高了可能会自杀
+
+游戏规则：
+- 每轮选择1-6号选项
+- 时间有限，快做决定！
+- 6轮后房租到期
+- 没钱交租就会被赶出去
+
+按键：
+- 1-6：选择选项
+- 回车/空格：继续
+- ESC：查看状态"""
+
+        help_win = tk.Toplevel(self.root)
+        help_win.title("游戏说明")
+        help_win.geometry("500x500")
+        help_win.configure(bg=BG_DARK)
+
+        text = tk.Text(help_win, bg=BG_MEDIUM, fg='white', font=("Courier", 11),
+                      wrap="word", padx=20, pady=20)
+        text.pack(fill="both", expand=True)
+        text.insert("1.0", help_text)
+        text.config(state="disabled")
+
+        tk.Button(help_win, text="关闭", command=help_win.destroy,
+                 bg=BG_LIGHT, fg="white", font=("Courier", 12)).pack(pady=10)
+
+    def show_shortcuts(self):
+        """显示快捷键"""
+        shortcuts = """【快捷键】
+
+1-6     选择对应选项
+Enter   继续下一轮
+Space   继续下一轮
+F1      游戏说明
+F2      存档槽1
+F3      读档槽1
+"""
+        messagebox.showinfo("快捷键", shortcuts)
+
+    def restart_game(self):
+        """重新开始游戏"""
+        self.player = HumanTrash()
+        self.displayed_actions = []
+        self.timer_running = False
+        self.time_left = 25
+        self.timer_id = None
+        self.debuff_active = False
+        self.game_over = False
+        self.rent_amount = 40
+
+        self.create_widgets()
+        self.start_new_round()
+
+    def refresh_display(self):
+        """刷新显示"""
+        self.cash_var.set(max(0, self.player.cash))
+        self.sober_var.set(max(0, min(100, self.player.sober)))
+        self.rep_var.set(max(0, min(100, self.player.reputation)))
+        self.wd_var.set(max(0, min(100, self.player.withdrawal)))
+        self.anxiety_var.set(max(0, min(100, self.player.anxiety)))
+        self.despair_var.set(max(0, min(100, self.player.despair)))
+
+        self.cash_value_label.configure(text=f"£{self.player.cash}")
+        self.sober_value_label.configure(text=str(self.player.sober))
+        self.rep_value_label.configure(text=str(self.player.reputation))
+        self.wd_value_label.configure(text=str(self.player.withdrawal))
+        self.anxiety_value_label.configure(text=str(self.player.anxiety))
+        self.despair_value_label.configure(text=str(self.player.despair))
+
+        self.time_label.configure(text=f"第{self.player.day}天 {self.player.hour}:00")
+        self.rent_label.configure(text=f"房租: £{self.rent_amount} | {self.player.rent_due}轮后到期")
+
     def create_widgets(self):
-        title = tk.Label(self.root, text="✞ CHOOSE LIFE = CHOOSE MISERY ✞",
-                         font=("Courier", 16, "bold"), fg=RED, bg=BG_DARK)
-        title.pack(pady=8)
+        # 先清除现有部件
+        for widget in self.root.winfo_children():
+            if widget != self.root.config('menu')[-1]:  # 保留菜单
+                widget.destroy()
+
+        # 标题
+        title_frame = tk.Frame(self.root, bg=BG_DARK)
+        title_frame.pack(pady=5)
+
+        title = tk.Label(title_frame, text="✞ CHOOSE LIFE = CHOOSE MISERY ✞",
+                         font=("Courier New", 18, "bold"), fg=RED, bg=BG_DARK)
+        title.pack()
+
+        subtitle = tk.Label(title_frame, text="在黑暗中做出选择，要么堕落，要么毁灭",
+                           font=("Courier", 10, "italic"), fg=GRAY, bg=BG_DARK)
+        subtitle.pack()
 
         top_frame = tk.Frame(self.root, bg=BG_DARK)
         top_frame.pack(fill="x", padx=20)
@@ -528,86 +900,73 @@ class ChooseLifeGame:
         status_frame = tk.Frame(self.root, bg=BG_DARK, bd=1, relief="solid")
         status_frame.pack(pady=5, padx=20, fill="x")
 
+        # 属性面板 - 使用更美观的进度条样式
+        stats_container = tk.Frame(status_frame, bg=BG_LIGHT, bd=0, relief="flat")
+        stats_container.pack(fill="x", padx=5, pady=5)
+
+        # 创建自定义进度条样式
+        def create_stat_bar(parent, label, icon, color, var, max_val=100):
+            frame = tk.Frame(parent, bg=BG_LIGHT)
+            frame.pack(fill="x", pady=3)
+
+            # 标签
+            tk.Label(frame, text=f"{icon} {label}", fg=color, bg=BG_LIGHT,
+                    width=10, anchor="w", font=("Courier New", 10, "bold")).pack(side="left")
+
+            # 进度条背景
+            bar_bg = tk.Frame(frame, bg="#1a1a1a", height=16)
+            bar_bg.pack(side="left", fill="x", expand=True, padx=5)
+            bar_bg.pack_propagate(False)
+
+            # 进度条前景
+            var.set(min(max_val, var.get()))
+            progress = var.get() / max_val
+            bar_fill = tk.Frame(bar_bg, bg=color, height=14)
+            bar_fill.place(relx=0, rely=0.5, relwidth=progress, anchor="w")
+            bar_fill.pack_propagate(False)
+
+            # 数值显示
+            value_label = tk.Label(frame, text=str(var.get()), fg=color, bg=BG_LIGHT,
+                                  width=6, font=("Courier New", 10, "bold"))
+            value_label.pack(side="right")
+
+            return var, bar_fill, value_label
+
         # 现金
-        cash_frame = tk.Frame(status_frame, bg=BG_DARK)
-        cash_frame.pack(fill="x", pady=2)
-        tk.Label(cash_frame, text="💰 现金 £", fg=GREEN, bg=BG_DARK, width=10, anchor="w").pack(side="left")
         self.cash_var = tk.IntVar()
         self.cash_var.set(50)
-        self.cash_scale = tk.Scale(cash_frame, from_=0, to=200, orient="horizontal",
-                                   variable=self.cash_var, bg=BG_DARK, fg=GREEN,
-                                   highlightthickness=0, length=250, showvalue=0)
-        self.cash_scale.pack(side="left")
-        self.cash_value_label = tk.Label(cash_frame, text="£50", fg="#00FF00", bg="#333333", bd=2, relief="solid",
-                                         width=8, anchor="w", font=("Courier", 12, "bold"))
-        self.cash_value_label.pack(side="left", padx=5)
+        self.cash_var, self.cash_bar, self.cash_value_label = create_stat_bar(
+            stats_container, "现金", "💰", COLORS['cash'], self.cash_var, 200)
 
         # 清醒度
-        sober_frame = tk.Frame(status_frame, bg=BG_DARK)
-        sober_frame.pack(fill="x", pady=2)
-        tk.Label(sober_frame, text="🧠 清醒度", fg=GREEN, bg=BG_DARK, width=10, anchor="w").pack(side="left")
         self.sober_var = tk.IntVar()
         self.sober_var.set(60)
-        self.sober_scale = tk.Scale(sober_frame, from_=0, to=100, orient="horizontal",
-                                    variable=self.sober_var, bg=BG_DARK, fg=GREEN,
-                                    highlightthickness=0, length=250, showvalue=0)
-        self.sober_scale.pack(side="left")
-        self.sober_value_label = tk.Label(sober_frame, text="60", fg="#00FF00", bg="#333333", bd=2, relief="solid",
-                                          width=8, anchor="w", font=("Courier", 12, "bold"))
-        self.sober_value_label.pack(side="left", padx=5)
+        self.sober_var, self.sober_bar, self.sober_value_label = create_stat_bar(
+            stats_container, "清醒度", "🧠", COLORS['sober'], self.sober_var, 100)
 
         # 信誉
-        rep_frame = tk.Frame(status_frame, bg=BG_DARK)
-        rep_frame.pack(fill="x", pady=2)
-        tk.Label(rep_frame, text="👥 信誉", fg=YELLOW, bg=BG_DARK, width=10, anchor="w").pack(side="left")
         self.rep_var = tk.IntVar()
         self.rep_var.set(40)
-        self.rep_scale = tk.Scale(rep_frame, from_=0, to=100, orient="horizontal",
-                                   variable=self.rep_var, bg=BG_DARK, fg=YELLOW,
-                                   highlightthickness=0, length=250, showvalue=0)
-        self.rep_scale.pack(side="left")
-        self.rep_value_label = tk.Label(rep_frame, text="40", fg="#FFFF00", bg="#333333", bd=2, relief="solid",
-                                         width=8, anchor="w", font=("Courier", 12, "bold"))
-        self.rep_value_label.pack(side="left", padx=5)
+        self.rep_var, self.rep_bar, self.rep_value_label = create_stat_bar(
+            stats_container, "信誉", "👥", COLORS['reputation'], self.rep_var, 100)
 
         # 戒断值
-        wd_frame = tk.Frame(status_frame, bg=BG_DARK)
-        wd_frame.pack(fill="x", pady=2)
-        tk.Label(wd_frame, text="💉 戒断值", fg=PURPLE, bg=BG_DARK, width=10, anchor="w").pack(side="left")
         self.wd_var = tk.IntVar()
         self.wd_var.set(20)
-        self.wd_scale = tk.Scale(wd_frame, from_=0, to=100, orient="horizontal",
-                                  variable=self.wd_var, bg=BG_DARK, fg=PURPLE,
-                                  highlightthickness=0, length=250, showvalue=0)
-        self.wd_scale.pack(side="left")
-        self.wd_value_label = tk.Label(wd_frame, text="20", fg="#CC66FF", bg="#333333", bd=2, relief="solid",
-                                        width=8, anchor="w", font=("Courier", 12, "bold"))
-        self.wd_value_label.pack(side="left", padx=5)
+        self.wd_var, self.wd_bar, self.wd_value_label = create_stat_bar(
+            stats_container, "戒断值", "💉", COLORS['withdrawal'], self.wd_var, 100)
 
-        # 焦虑和绝望
-        anx_frame = tk.Frame(status_frame, bg=BG_DARK)
-        anx_frame.pack(fill="x", pady=2)
-        tk.Label(anx_frame, text="😰 焦虑", fg=RED, bg=BG_DARK, width=10, anchor="w").pack(side="left")
+        # 焦虑
         self.anxiety_var = tk.IntVar()
         self.anxiety_var.set(90)
-        self.anxiety_scale = tk.Scale(anx_frame, from_=0, to=100, orient="horizontal",
-                                      variable=self.anxiety_var, bg=BG_DARK, fg=RED,
-                                      highlightthickness=0, length=150, showvalue=0)
-        self.anxiety_scale.pack(side="left")
-        self.anxiety_value_label = tk.Label(anx_frame, text="90", fg="#FF6666", bg="#333333", bd=2, relief="solid",
-                                             width=5, anchor="w", font=("Courier", 12, "bold"))
-        self.anxiety_value_label.pack(side="left", padx=5)
+        self.anxiety_var, self.anxiety_bar, self.anxiety_value_label = create_stat_bar(
+            stats_container, "焦虑", "😰", COLORS['anxiety'], self.anxiety_var, 100)
 
-        tk.Label(anx_frame, text="💀 绝望", fg=RED, bg=BG_DARK, width=8, anchor="w").pack(side="left", padx=(10,0))
+        # 绝望
         self.despair_var = tk.IntVar()
         self.despair_var.set(50)
-        self.despair_scale = tk.Scale(anx_frame, from_=0, to=100, orient="horizontal",
-                                      variable=self.despair_var, bg=BG_DARK, fg=RED,
-                                      highlightthickness=0, length=150, showvalue=0)
-        self.despair_scale.pack(side="left")
-        self.despair_value_label = tk.Label(anx_frame, text="50", fg="#FF6666", bg="#333333", bd=2, relief="solid",
-                                             width=5, anchor="w", font=("Courier", 12, "bold"))
-        self.despair_value_label.pack(side="left", padx=5)
+        self.despair_var, self.despair_bar, self.despair_value_label = create_stat_bar(
+            stats_container, "绝望", "💀", COLORS['despair'], self.despair_var, 100)
 
         # 场景描述
         self.scene_label = tk.Label(self.root, text="", font=("Courier", 11),
@@ -787,19 +1146,34 @@ class ChooseLifeGame:
             self.show_ending("debt")
 
     def update_status(self):
+        # 更新变量值
         self.cash_var.set(max(0, self.player.cash))
-        self.sober_var.set(max(0, self.player.sober))
-        self.rep_var.set(max(0, self.player.reputation))
-        self.wd_var.set(max(0, self.player.withdrawal))
+        self.sober_var.set(max(0, min(100, self.player.sober)))
+        self.rep_var.set(max(0, min(100, self.player.reputation)))
+        self.wd_var.set(max(0, min(100, self.player.withdrawal)))
         self.anxiety_var.set(max(0, min(100, self.player.anxiety)))
         self.despair_var.set(max(0, min(100, self.player.despair)))
 
+        # 更新数值标签
         self.cash_value_label.configure(text=f"£{self.player.cash}")
         self.sober_value_label.configure(text=str(self.player.sober))
         self.rep_value_label.configure(text=str(self.player.reputation))
         self.wd_value_label.configure(text=str(self.player.withdrawal))
         self.anxiety_value_label.configure(text=str(self.player.anxiety))
         self.despair_value_label.configure(text=str(self.player.despair))
+
+        # 更新进度条颜色和宽度
+        def update_bar(bar, value, max_val, color):
+            progress = max(0, min(1, value / max_val))
+            bar.configure(bg=color)
+            bar.place_configure(relwidth=progress)
+
+        update_bar(self.cash_bar, self.player.cash, 200, COLORS['cash'])
+        update_bar(self.sober_bar, self.player.sober, 100, COLORS['sober'])
+        update_bar(self.rep_bar, self.player.reputation, 100, COLORS['reputation'])
+        update_bar(self.wd_bar, self.player.withdrawal, 100, COLORS['withdrawal'])
+        update_bar(self.anxiety_bar, self.player.anxiety, 100, COLORS['anxiety'])
+        update_bar(self.despair_bar, self.player.despair, 100, COLORS['despair'])
 
     def make_choice(self, idx):
         try:
