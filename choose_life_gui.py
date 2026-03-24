@@ -151,6 +151,784 @@ def get_save_info(slot):
     return "空存档"
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 版本控制
+# ═══════════════════════════════════════════════════════════════════════════
+SAVE_FORMAT_VERSION = 3
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 属性系统配置
+# ═══════════════════════════════════════════════════════════════════════════
+STAT_BOUNDS = {
+    # 财务维度
+    'cash': {'min': 0, 'max': 1000, 'critical_low': 10},
+    'bank_balance': {'min': 0, 'max': 10000},
+    'debt': {'min': 0, 'max': 1000, 'warning_threshold': 100},
+    'income_level': {'min': 0, 'max': 10},
+    # 身体健康维度
+    'sober': {'min': 0, 'max': 100, 'critical_low': 20, 'crisis_below': 10},
+    'health': {'min': 0, 'max': 100, 'critical_low': 30},
+    'withdrawal': {'min': 0, 'max': 100, 'crisis_above': 90},
+    # 精神健康维度
+    'anxiety': {'min': 0, 'max': 100, 'crisis_above': 85},
+    'despair': {'min': 0, 'max': 100, 'crisis_above': 90},
+    'hope': {'min': 0, 'max': 100},
+    # 社交维度
+    'reputation': {'min': 0, 'max': 100, 'critical_low': 20},
+    'social_connections': {'min': 0, 'max': 20},
+    'influence': {'min': 0, 'max': 100},
+}
+
+# 状态条颜色 - 扩展版
+COLORS_EX = {
+    'cash': '#2ECC71',        # 绿色 - 现金
+    'bank_balance': '#27AE60', # 深绿 - 银行
+    'debt': '#E74C3C',        # 红色 - 债务
+    'sober': '#3498DB',       # 蓝色 - 清醒度
+    'health': '#E67E22',      # 橙色 - 健康
+    'withdrawal': '#9B59B6',  # 紫色 - 戒断值
+    'anxiety': '#E74C3C',     # 红色 - 焦虑
+    'despair': '#1ABC9C',     # 青色 - 绝望
+    'hope': '#F1C40F',       # 黄色 - 希望
+    'reputation': '#F39C12',  # 橙色 - 信誉
+    'social_connections': '#2ECC71', # 绿色 - 社交
+    'influence': '#9B59B6',   # 紫色 - 影响力
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NPC关系系统
+# ═══════════════════════════════════════════════════════════════════════════
+class NPCRelationship:
+    """NPC关系数据类"""
+    def __init__(self, npc_id):
+        self.npc_id = npc_id
+        self.affinity = 20       # 好感度 0-100
+        self.trust = 10          # 信任度 0-100
+        self.state = 'stranger'  # enemy/stranger/acquaintance/friend/close_friend
+        self.interaction_count = 0
+        self.last_interaction_day = 0
+        self.positive_interactions = 0
+        self.negative_interactions = 0
+        self.has_met = False
+        self.special_unlocked = False
+
+    def to_dict(self):
+        return {
+            'npc_id': self.npc_id,
+            'affinity': self.affinity,
+            'trust': self.trust,
+            'state': self.state,
+            'interaction_count': self.interaction_count,
+            'last_interaction_day': self.last_interaction_day,
+            'positive_interactions': self.positive_interactions,
+            'negative_interactions': self.negative_interactions,
+            'has_met': self.has_met,
+            'special_unlocked': self.special_unlocked,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        rel = cls(data.get('npc_id', ''))
+        rel.affinity = data.get('affinity', 20)
+        rel.trust = data.get('trust', 10)
+        rel.state = data.get('state', 'stranger')
+        rel.interaction_count = data.get('interaction_count', 0)
+        rel.last_interaction_day = data.get('last_interaction_day', 0)
+        rel.positive_interactions = data.get('positive_interactions', 0)
+        rel.negative_interactions = data.get('negative_interactions', 0)
+        rel.has_met = data.get('has_met', False)
+        rel.special_unlocked = data.get('special_unlocked', False)
+        return rel
+
+# NPC定义
+NPC_DEFINITIONS = {
+    'renton': {
+        'name': 'Renton',
+        'role': 'best_friend',
+        'description': '你的发小，早已离开这座城市',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 15, 'friend': 35, 'close_friend': 60},
+        'enemy_threshold': -999,  # 不会主动变敌人
+    },
+    'mark': {
+        'name': 'Mark',
+        'role': 'debt_collector',
+        'description': '危险的债务人，心狠手辣',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 10, 'friend': 40, 'close_friend': 70},
+        'enemy_threshold': -20,
+    },
+    'sick_boy': {
+        'name': 'Sick Boy',
+        'role': 'dealer',
+        'description': '毒贩，总有新货和歪点子',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 10, 'friend': 30, 'close_friend': 55},
+        'enemy_threshold': -999,
+    },
+    'begbie': {
+        'name': 'Begbie',
+        'role': 'criminal',
+        'description': '暴力倾向严重，最好别惹他',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 5, 'friend': 25, 'close_friend': 50},
+        'enemy_threshold': -10,
+    },
+    'spud': {
+        'name': 'Spud',
+        'role': 'friend',
+        'description': '最忠诚的朋友，但太懦弱',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 5, 'friend': 20, 'close_friend': 45},
+        'enemy_threshold': -999,
+    },
+    'diane': {
+        'name': 'Diane',
+        'role': 'ex_girlfriend',
+        'description': '你的前女友，已经有了新生活',
+        'state_thresholds': {'stranger': 0, 'acquaintance': 10, 'friend': 30, 'close_friend': 55},
+        'enemy_threshold': -15,
+    },
+}
+
+def update_relationship_state(rel):
+    """根据好感度更新NPC关系状态"""
+    npc_def = NPC_DEFINITIONS.get(rel.npc_id, {})
+    thresholds = npc_def.get('state_thresholds', {})
+    enemy_thresh = npc_def.get('enemy_threshold', -20)
+
+    if rel.affinity <= enemy_thresh:
+        rel.state = 'enemy'
+    elif rel.affinity >= thresholds.get('close_friend', 60):
+        rel.state = 'close_friend'
+    elif rel.affinity >= thresholds.get('friend', 35):
+        rel.state = 'friend'
+    elif rel.affinity >= thresholds.get('acquaintance', 15):
+        rel.state = 'acquaintance'
+    else:
+        rel.state = 'stranger'
+
+    # 解锁特殊互动
+    if rel.affinity >= thresholds.get('close_friend', 60):
+        rel.special_unlocked = True
+
+    return rel
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 任务系统
+# ═══════════════════════════════════════════════════════════════════════════
+class Quest:
+    """任务数据类"""
+    def __init__(self, quest_id, quest_type, title, description, objectives, rewards, prerequisites=None, time_limit=None):
+        self.quest_id = quest_id
+        self.quest_type = quest_type  # MAIN / SIDE
+        self.title = title
+        self.description = description
+        self.objectives = objectives  # [{'id': str, 'description': str, 'target': int, 'current': int}]
+        self.rewards = rewards
+        self.prerequisites = prerequisites or {}
+        self.time_limit = time_limit
+        self.is_active = False
+        self.is_completed = False
+        self.is_failed = False
+        self.completed_at = None
+        self.failed_at = None
+        self.activated_at = None
+
+    def to_dict(self):
+        return {
+            'quest_id': self.quest_id,
+            'quest_type': self.quest_type,
+            'title': self.title,
+            'description': self.description,
+            'objectives': self.objectives,
+            'rewards': self.rewards,
+            'prerequisites': self.prerequisites,
+            'time_limit': self.time_limit,
+            'is_active': self.is_active,
+            'is_completed': self.is_completed,
+            'is_failed': self.is_failed,
+            'completed_at': self.completed_at,
+            'failed_at': self.failed_at,
+            'activated_at': self.activated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        q = cls(
+            data.get('quest_id', ''),
+            data.get('quest_type', 'SIDE'),
+            data.get('title', ''),
+            data.get('description', ''),
+            data.get('objectives', []),
+            data.get('rewards', {}),
+            data.get('prerequisites', {}),
+            data.get('time_limit', None)
+        )
+        q.is_active = data.get('is_active', False)
+        q.is_completed = data.get('is_completed', False)
+        q.is_failed = data.get('is_failed', False)
+        q.completed_at = data.get('completed_at', None)
+        q.failed_at = data.get('failed_at', None)
+        q.activated_at = data.get('activated_at', None)
+        return q
+
+    def check_completion(self):
+        """检查任务是否完成"""
+        if self.is_completed or self.is_failed:
+            return
+        for obj in self.objectives:
+            if obj.get('current', 0) < obj.get('target', 1):
+                return False
+        self.is_completed = True
+        self.completed_at = datetime.now().isoformat()
+        return True
+
+    def check_failure(self, current_day):
+        """检查任务是否失败"""
+        if self.is_completed or self.is_failed:
+            return False
+        if self.time_limit and self.activated_at:
+            if current_day - self.activated_at > self.time_limit:
+                self.is_failed = True
+                self.failed_at = datetime.now().isoformat()
+                return True
+        return False
+
+class QuestManager:
+    """任务管理器"""
+    def __init__(self, player):
+        self.player = player
+        self.all_quests = {}
+        self.active_quests = []
+        self.completed_quests = []
+        self.failed_quests = []
+        self._init_quests()
+
+    def _init_quests(self):
+        """初始化所有任务"""
+        # 主线任务
+        self.all_quests['main_ch1_1'] = Quest(
+            'main_ch1_1', 'MAIN',
+            '生存的本能',
+            '你已经三天没吃东西了。必须找到钱或者食物。',
+            [
+                {'id': 'obj_1', 'description': '获得£20或更多现金', 'target': 20, 'current': 0, 'type': 'stat', 'stat': 'cash', 'operator': '>=', 'check_type': 'gain'},
+                {'id': 'obj_2', 'description': '保持清醒度高于20', 'target': 20, 'current': 0, 'type': 'stat', 'stat': 'sober', 'operator': '>', 'check_type': 'maintain'},
+            ],
+            {'cash': 20, 'sober': 10, 'reputation': 5},
+            {'min_day': 1, 'max_day': 3}
+        )
+
+        self.all_quests['main_ch1_2'] = Quest(
+            'main_ch1_2', 'MAIN',
+            '联系旧友',
+            'Renton走了。但也许Mark能帮上忙...',
+            [
+                {'id': 'obj_1', 'description': '联系Mark', 'target': 1, 'current': 0, 'type': 'npc_interaction', 'npc': 'mark'},
+                {'id': 'obj_2', 'description': '联系Renton', 'target': 1, 'current': 0, 'type': 'npc_interaction', 'npc': 'renton'},
+            ],
+            {'cash': 30},
+            {'required_quests': ['main_ch1_1']}
+        )
+
+        self.all_quests['main_ch2_1'] = Quest(
+            'main_ch2_1', 'MAIN',
+            'Mark的威胁',
+            'Mark说三天内要还£100。否则...',
+            [
+                {'id': 'obj_1', 'description': '还清Mark的债务£100', 'target': 100, 'current': 0, 'type': 'stat', 'stat': 'cash', 'operator': '>=', 'check_type': 'pay'},
+            ],
+            {'reputation': 20, 'mark_trust': 15},
+            {'required_quests': ['main_ch1_2']},
+            time_limit=18
+        )
+
+        # 支线任务
+        self.all_quests['side_spud_1'] = Quest(
+            'side_spud_1', 'SIDE',
+            'Spud的鞋子',
+            'Spud借了你£50买药，现在他想要回...',
+            [
+                {'id': 'obj_1', 'description': '找到£50还给Spud', 'target': 50, 'current': 0, 'type': 'stat', 'stat': 'cash', 'operator': '>=', 'check_type': 'gain'},
+            ],
+            {'spud_affinity': 25, 'spud_trust': 20},
+        )
+
+        self.all_quests['side_diane_1'] = Quest(
+            'side_diane_1', 'SIDE',
+            'Diane的消息',
+            'Diane发来消息：好久不见，想聊聊吗？',
+            [
+                {'id': 'obj_1', 'description': '回复Diane的消息', 'target': 1, 'current': 0, 'type': 'choice', 'choice_id': 'diane_reconnect'},
+            ],
+            {'diane_affinity': 10, 'hope': 5},
+            {'required_quests': ['main_ch1_2']}
+        )
+
+        self.all_quests['side_community_1'] = Quest(
+            'side_community_1', 'SIDE',
+            '戒毒互助会',
+            '也许该试试正经的帮助',
+            [
+                {'id': 'obj_1', 'description': '参加互助会3次', 'target': 3, 'current': 0, 'type': 'action_count', 'action_id': 'support_group'},
+            ],
+            {'withdrawal': -30, 'sober': 20, 'hope': 15},
+        )
+
+    def check_prerequisites(self, quest_id):
+        """检查任务前置条件"""
+        quest = self.all_quests.get(quest_id)
+        if not quest:
+            return False
+
+        prereqs = quest.prerequisites
+
+        # 检查天数范围
+        min_day = prereqs.get('min_day', 1)
+        max_day = prereqs.get('max_day', 999)
+        if not (min_day <= self.player.day <= max_day):
+            return False
+
+        # 检查必需完成的任务
+        required_quests = prereqs.get('required_quests', [])
+        for req_quest_id in required_quests:
+            if req_quest_id not in self.completed_quests:
+                return False
+
+        # 检查NPC关系
+        npc_reqs = prereqs.get('npc_relationships', {})
+        for npc_id, (req_state, min_affinity) in npc_reqs.items():
+            rel = self.player.relationships.get(npc_id)
+            if not rel or rel.state not in req_state or rel.affinity < min_affinity:
+                return False
+
+        return True
+
+    def activate_quest(self, quest_id):
+        """激活任务"""
+        quest = self.all_quests.get(quest_id)
+        if not quest or quest.is_active or quest.is_completed or quest.is_failed:
+            return False
+
+        if not self.check_prerequisites(quest_id):
+            return False
+
+        quest.is_active = True
+        quest.activated_at = self.player.day
+        if quest_id not in self.active_quests:
+            self.active_quests.append(quest_id)
+        return True
+
+    def update_quest_progress(self, stat=None, value=None, action_id=None, npc_id=None, choice_id=None):
+        """更新任务进度"""
+        for quest_id in self.active_quests:
+            quest = self.all_quests.get(quest_id)
+            if not quest or not quest.is_active:
+                continue
+
+            for obj in quest.objectives:
+                obj_type = obj.get('type')
+
+                if obj_type == 'stat' and stat:
+                    # 检查是否满足条件
+                    target = obj.get('target', 0)
+                    current = obj.get('current', 0)
+                    check_type = obj.get('check_type', 'gain')
+
+                    if obj.get('stat') == stat:
+                        if check_type == 'gain' and value > 0:
+                            obj['current'] = current + value
+                        elif check_type == 'maintain':
+                            if value >= target:
+                                obj['current'] = target  # 维持住了
+                        elif check_type == 'pay' and value > 0:
+                            obj['current'] = current + value
+
+                elif obj_type == 'npc_interaction' and npc_id:
+                    if obj.get('npc') == npc_id:
+                        obj['current'] = obj.get('current', 0) + 1
+
+                elif obj_type == 'action_count' and action_id:
+                    if obj.get('action_id') == action_id:
+                        obj['current'] = obj.get('current', 0) + 1
+
+                elif obj_type == 'choice' and choice_id:
+                    if obj.get('choice_id') == choice_id:
+                        obj['current'] = obj.get('current', 0) + 1
+
+                # 检查是否完成
+                if quest.check_completion():
+                    self.active_quests.remove(quest_id)
+                    self.completed_quests.append(quest_id)
+                    self.apply_rewards(quest)
+
+    def apply_rewards(self, quest):
+        """应用任务奖励"""
+        rewards = quest.rewards
+        for stat, value in rewards.items():
+            if stat.endswith('_affinity') or stat.endswith('_trust'):
+                # NPC关系奖励
+                npc_id = stat.replace('_affinity', '').replace('_trust', '')
+                rel = self.player.relationships.get(npc_id)
+                if rel:
+                    if '_affinity' in stat:
+                        rel.affinity = max(0, min(100, rel.affinity + value))
+                    elif '_trust' in stat:
+                        rel.trust = max(0, min(100, rel.trust + value))
+                    update_relationship_state(rel)
+            else:
+                # 属性奖励
+                self.player.apply_effect(stat, value)
+
+    def check_failures(self):
+        """检查任务失败"""
+        for quest_id in list(self.active_quests):
+            quest = self.all_quests.get(quest_id)
+            if quest and quest.check_failure(self.player.day):
+                if quest_id in self.active_quests:
+                    self.active_quests.remove(quest_id)
+                self.failed_quests.append(quest_id)
+
+    def check_new_quests(self):
+        """检查可以激活的新任务"""
+        newly_activated = []
+        for quest_id, quest in self.all_quests.items():
+            if quest_id not in self.active_quests and not quest.is_active and not quest.is_completed and not quest.is_failed:
+                if self.check_prerequisites(quest_id):
+                    if self.activate_quest(quest_id):
+                        newly_activated.append(quest_id)
+        return newly_activated
+
+    def to_dict(self):
+        return {
+            'active_quests': self.active_quests,
+            'completed_quests': self.completed_quests,
+            'failed_quests': self.failed_quests,
+            'quest_data': {qid: q.to_dict() for qid, q in self.all_quests.items()}
+        }
+
+    @classmethod
+    def from_dict(cls, data, player):
+        qm = cls(player)
+        qm.active_quests = data.get('active_quests', [])
+        qm.completed_quests = data.get('completed_quests', [])
+        qm.failed_quests = data.get('failed_quests', [])
+        # 重建任务对象
+        for qid, qdata in data.get('quest_data', {}).items():
+            if qid in qm.all_quests:
+                qm.all_quests[qid] = Quest.from_dict(qdata)
+        return qm
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 事件系统重构
+# ═══════════════════════════════════════════════════════════════════════════
+class EventType:
+    CONDITION_TRIGGERED = 'condition'
+    QUEST_TRIGGERED = 'quest'
+    NPC_RELATED = 'npc'
+    RANDOM_MINOR = 'random_minor'
+    RANDOM_MAJOR = 'random_major'
+    STORY_CHAPTER = 'story'
+
+class GameEvent:
+    """游戏事件类"""
+    def __init__(self, event_id, event_type, narrative, effects, conditions=None, probability=0.0, min_day=None, max_day=None, cooldown_rounds=0, quest_id=None, npc_id=None):
+        self.event_id = event_id
+        self.event_type = event_type
+        self.narrative = narrative
+        self.effects = effects  # [{'stat': str, 'value': int}, ...]
+        self.conditions = conditions or {}
+        self.probability = probability
+        self.min_day = min_day
+        self.max_day = max_day
+        self.cooldown_rounds = cooldown_rounds
+        self.quest_id = quest_id
+        self.npc_id = npc_id
+        self.last_triggered_round = None
+
+    def can_trigger(self, player, current_round):
+        """检查事件是否可以触发"""
+        # 冷却检查
+        if self.last_triggered_round and (current_round - self.last_triggered_round) < self.cooldown_rounds:
+            return False
+
+        # 天数检查
+        if self.min_day and player.day < self.min_day:
+            return False
+        if self.max_day and player.day > self.max_day:
+            return False
+
+        # 条件检查
+        if self.conditions:
+            # NPC关系条件
+            npc_reqs = self.conditions.get('npc_relationships', {})
+            for npc_id, (req_state, min_affinity) in npc_reqs.items():
+                rel = player.relationships.get(npc_id)
+                if not rel:
+                    return False
+                if isinstance(req_state, list):
+                    if rel.state not in req_state:
+                        return False
+                elif rel.state != req_state:
+                    return False
+                if min_affinity and rel.affinity < min_affinity:
+                    return False
+
+            # 属性条件
+            stat_checks = self.conditions.get('stat_checks', {})
+            for stat, (op, value) in stat_checks.items():
+                current = getattr(player, stat, 0)
+                if op == '>=' and not (current >= value):
+                    return False
+                elif op == '>' and not (current > value):
+                    return False
+                elif op == '<=' and not (current <= value):
+                    return False
+                elif op == '<' and not (current < value):
+                    return False
+                elif op == '==' and not (current == value):
+                    return False
+
+            # 故事标志条件
+            story_flags_req = self.conditions.get('story_flags', {})
+            for flag, expected_value in story_flags_req.items():
+                actual_value = player.story_flags.get(flag)
+                if expected_value is True:
+                    if not actual_value:
+                        return False
+                elif actual_value != expected_value:
+                    return False
+
+        return True
+
+    def trigger(self, player):
+        """触发事件"""
+        self.last_triggered_round = player.round
+        for effect in self.effects:
+            player.apply_effect(effect.get('stat'), effect.get('value', 0))
+        return self.narrative
+
+# 事件定义 - 关键剧情事件（确定性触发）
+STORY_EVENTS = {
+    'diane_text_1': GameEvent(
+        'diane_text_1', EventType.CONDITION_TRIGGERED,
+        '你的手机亮了。是Diane发来的消息..."好久久不见..."',
+        [{'stat': 'hope', 'value': 5}, {'stat': 'despair', 'value': -5}],
+        conditions={'stat_checks': {'day': ('>=', 3)}},
+        npc_id='diane'
+    ),
+    'mark_appears': GameEvent(
+        'mark_appears', EventType.CONDITION_TRIGGERED,
+        'Mark出现在你家门口。他笑了，但那笑容让你背脊发凉..."£100，三天。"',
+        [{'stat': 'anxiety', 'value': 20}, {'stat': 'despair', 'value': 15}],
+        conditions={'stat_checks': {'day': ('==', 5), 'cash': ('<', 50)}}
+    ),
+    # 父母相关后续事件
+    'parents_followup_home': GameEvent(
+        'parents_followup_home', EventType.CONDITION_TRIGGERED,
+        '几天后，母亲又打来电话..."儿子，回家看看吧。你爸...他其实也很想你。"',
+        [{'stat': 'hope', 'value': 10}, {'stat': 'despair', 'value': -5}],
+        conditions={'story_flags': {'called_parents_home': True}, 'stat_checks': {'day': ('>=', 7)}}
+    ),
+    'parents_followup_rejected': GameEvent(
+        'parents_followup_rejected', EventType.CONDITION_TRIGGERED,
+        '父亲托人带话：你还欠我们一次探视。下次再拒绝，就别回来了。',
+        [{'stat': 'anxiety', 'value': 15}, {'stat': 'despair', 'value': 10}],
+        conditions={'story_flags': {'asked_parents_for_money': True}, 'stat_checks': {'day': ('>=', 5)}}
+    ),
+    'parents_followup_mother': GameEvent(
+        'parents_followup_mother', EventType.CONDITION_TRIGGERED,
+        '母亲发来消息："儿子，最近还好吗？妈妈给你留了你爱吃的..."',
+        [{'stat': 'hope', 'value': 8}, {'stat': 'despair', 'value': -8}],
+        conditions={'story_flags': {'reconnected_with_mother': True}, 'stat_checks': {'day': ('>=', 4)}}
+    ),
+    # Diane后续事件
+    'diane_regrets': GameEvent(
+        'diane_regrets', EventType.CONDITION_TRIGGERED,
+        'Diane发来消息："其实...我有时候也会想起我们在一起的时光。"',
+        [{'stat': 'hope', 'value': 10}, {'stat': 'anxiety', 'value': 5}],
+        conditions={'stat_checks': {'day': ('>=', 8), 'reputation': ('>=', 50)}}
+    ),
+    # Mark债务后续
+    'mark_debt_reminder': GameEvent(
+        'mark_debt_reminder', EventType.CONDITION_TRIGGERED,
+        'Mark的伙计来提醒："Mark说你还欠着钱。别想跑。"',
+        [{'stat': 'anxiety', 'value': 15}, {'stat': 'despair', 'value': 10}],
+        conditions={'story_flags': {'owed_mark': True}, 'stat_checks': {'day': ('>=', 4)}}
+    ),
+    'mark_threat': GameEvent(
+        'mark_threat', EventType.CONDITION_TRIGGERED,
+        'Mark发来最后通牒："最后期限到了。你知道的，欠债还钱，欠命还命。"',
+        [{'stat': 'anxiety', 'value': 25}, {'stat': 'despair', 'value': 20}],
+        conditions={'story_flags': {'owed_mark': True}, 'stat_checks': {'day': ('>=', 7)}}
+    ),
+    # Spud相关
+    'spud_asks_money': GameEvent(
+        'spud_asks_money', EventType.CONDITION_TRIGGERED,
+        'Spud发来消息："嘿，兄弟...之前那£50，我真的很需要。能还吗？"',
+        [{'stat': 'anxiety', 'value': 5}],
+        conditions={'stat_checks': {'day': ('>=', 5)}}
+    ),
+    'spud_death': GameEvent(
+        'spud_death', EventType.CONDITION_TRIGGERED,
+        '你唯一的朋友Spud死了。overdose。你感觉世界上最后一盏灯也灭了...',
+        [{'stat': 'despair', 'value': 40}, {'stat': 'sober', 'value': -20}],
+        conditions={'stat_checks': {'day': ('>=', 10), 'withdrawal': ('>=', 80)}}
+    ),
+}
+
+# 事件链定义
+EVENT_CHAINS = {
+    'mark_debt_arc': {
+        'events': ['mark_appears', 'mark_threat'],
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 玩家类 - 重构版
+# ═══════════════════════════════════════════════════════════════════════════
+class Player:
+    """重构后的玩家类"""
+    def __init__(self):
+        # 财务维度
+        self.cash = 50
+        self.bank_balance = 0
+        self.debt = 0
+        self.income_level = 0
+        # 身体健康维度
+        self.sober = 60
+        self.health = 80
+        self.withdrawal = 20
+        # 精神健康维度
+        self.anxiety = 90
+        self.despair = 50
+        self.hope = 30
+        # 社交维度
+        self.reputation = 40
+        self.social_connections = 2
+        self.influence = 10
+        # 时间
+        self.day = 1
+        self.round = 0
+        self.hour = 12
+        self.rent_due = 6
+        # 记录
+        self.choices_log = []
+        self.history = []
+        # NPC关系
+        self.relationships = {npc_id: NPCRelationship(npc_id) for npc_id in NPC_DEFINITIONS.keys()}
+        # 任务系统（稍后初始化）
+        self.quest_manager = None
+        # 故事进度
+        self.current_chapter = 'chapter_1'
+        self.story_flags = {}
+        # 触发的事件
+        self.triggered_events = set()
+        # 活跃效果
+        self.active_effects = []
+
+    def apply_effect(self, stat, value):
+        """应用属性变化，带边界约束和跨维度影响"""
+        if not hasattr(self, stat):
+            return
+
+        bounds = STAT_BOUNDS.get(stat, {'min': 0, 'max': 100})
+        old_value = getattr(self, stat)
+        new_value = old_value + value
+
+        # 钳制到边界
+        new_value = max(bounds['min'], min(bounds['max'], new_value))
+        setattr(self, stat, new_value)
+
+        # 跨维度影响
+        if stat == 'withdrawal':
+            if value > 0:  # 戒断加深
+                self.sober = max(0, self.sober - int(value * 0.3))
+            elif value < 0:  # 戒断减轻
+                self.sober = max(0, self.sober + int(value * 0.2))
+
+        elif stat == 'despair':
+            if new_value >= 80:
+                self.sober = max(0, self.sober - 2)
+            if new_value >= 95:
+                self.anxiety = min(100, self.anxiety + 10)
+
+        elif stat == 'anxiety':
+            if new_value >= 80:
+                self.sober = max(0, self.sober - 1)
+
+        elif stat == 'reputation':
+            if new_value < 20:
+                # 所有人际关系变差
+                for rel in self.relationships.values():
+                    rel.affinity = max(0, rel.affinity - 5)
+                    update_relationship_state(rel)
+
+        elif stat == 'sober':
+            if new_value < 20:
+                self.anxiety = min(100, self.anxiety + 5)
+
+    def to_dict(self):
+        """转换为字典用于存档"""
+        return {
+            'version': SAVE_FORMAT_VERSION,
+            'cash': self.cash,
+            'bank_balance': self.bank_balance,
+            'debt': self.debt,
+            'income_level': self.income_level,
+            'sober': self.sober,
+            'health': self.health,
+            'withdrawal': self.withdrawal,
+            'anxiety': self.anxiety,
+            'despair': self.despair,
+            'hope': self.hope,
+            'reputation': self.reputation,
+            'social_connections': self.social_connections,
+            'influence': self.influence,
+            'day': self.day,
+            'round': self.round,
+            'hour': self.hour,
+            'rent_due': self.rent_due,
+            'choices_log': self.choices_log,
+            'history': self.history,
+            'relationships': {npc_id: rel.to_dict() for npc_id, rel in self.relationships.items()},
+            'current_chapter': self.current_chapter,
+            'story_flags': self.story_flags,
+            'triggered_events': list(self.triggered_events),
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        """从字典恢复"""
+        player = cls()
+        player.cash = data.get('cash', 50)
+        player.bank_balance = data.get('bank_balance', 0)
+        player.debt = data.get('debt', 0)
+        player.income_level = data.get('income_level', 0)
+        player.sober = data.get('sober', 60)
+        player.health = data.get('health', 80)
+        player.withdrawal = data.get('withdrawal', 20)
+        player.anxiety = data.get('anxiety', 90)
+        player.despair = data.get('despair', 50)
+        player.hope = data.get('hope', 30)
+        player.reputation = data.get('reputation', 40)
+        player.social_connections = data.get('social_connections', 2)
+        player.influence = data.get('influence', 10)
+        player.day = data.get('day', 1)
+        player.round = data.get('round', 0)
+        player.hour = data.get('hour', 12)
+        player.rent_due = data.get('rent_due', 6)
+        player.choices_log = data.get('choices_log', [])
+        player.history = data.get('history', [])
+        player.current_chapter = data.get('current_chapter', 'chapter_1')
+        player.story_flags = data.get('story_flags', {})
+        player.triggered_events = set(data.get('triggered_events', []))
+
+        # 恢复NPC关系
+        for npc_id, rel_data in data.get('relationships', {}).items():
+            player.relationships[npc_id] = NPCRelationship.from_dict(rel_data)
+
+        return player
+
+# 向后兼容：保留HumanTrash作为Player的别名
+HumanTrash = Player
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 动作库
 # ═══════════════════════════════════════════════════════════════════════════
 ALL_ACTIONS = [
@@ -678,8 +1456,8 @@ class HumanTrash:
 class ChooseLifeGame:
     def __init__(self, root):
         self.root = root
-        self.root.title("CHOOSE LIFE - 人生选择模拟器 v2.0")
-        self.root.geometry("1300x950")
+        self.root.title("CHOOSE LIFE - 人生选择模拟器 v3.0")
+        self.root.geometry("1400x1000")
         self.root.configure(bg=BG_DARK)
         self.root.bind('<Key>', self.handle_keypress)
         self.root.bind('<Return>', self.handle_keypress)
@@ -687,7 +1465,8 @@ class ChooseLifeGame:
         self.root.bind('<Button-1>', self.on_click)
         self.root.focus_force()
 
-        self.player = HumanTrash()
+        self.player = Player()
+        self.player.quest_manager = QuestManager(self.player)
         self.displayed_actions = []
         self.timer_running = False
         self.time_left = 25
@@ -695,9 +1474,13 @@ class ChooseLifeGame:
         self.debuff_active = False
         self.game_over = False
         self.rent_amount = 40
+        self.last_event_round = 0  # 事件冷却追踪
 
         self.create_menu()
         self.create_widgets()
+        # 初始化时先激活可用的任务
+        self.player.quest_manager.check_new_quests()
+        self._update_quest_display()
         self.start_new_round()
         self.play_background_music()
 
@@ -747,11 +1530,13 @@ class ChooseLifeGame:
     def quick_save(self, slot):
         """快速保存"""
         game_data = {
+            'version': SAVE_FORMAT_VERSION,
             'player': self.player.to_dict(),
             'rent_amount': self.rent_amount,
             'game_over': self.game_over,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'ending': '游戏中' if not self.game_over else '未知'
+            'ending': '游戏中' if not self.game_over else '未知',
+            'quest_manager': self.player.quest_manager.to_dict() if self.player.quest_manager else {},
         }
         if save_game(game_data, slot):
             messagebox.showinfo("保存成功", f"游戏已保存到存档槽 {slot}")
@@ -760,12 +1545,19 @@ class ChooseLifeGame:
         """快速加载"""
         data = load_game(slot)
         if data:
-            self.player = HumanTrash.from_dict(data.get('player', {}))
+            # 处理版本迁移
+            version = data.get('version', 1)
+            player_data = data.get('player', {})
+
+            self.player = Player.from_dict(player_data)
+            self.player.quest_manager = QuestManager.from_dict(
+                data.get('quest_manager', {}), self.player
+            )
             self.rent_amount = data.get('rent_amount', 40)
             self.game_over = data.get('game_over', False)
             self.refresh_display()
             self.setup_options()
-            messagebox.showinfo("加载成功", f"已从存档槽 {slot} 加载游戏")
+            messagebox.showinfo("加载成功", f"已从存档槽 {slot} 加载游戏 (v{version})")
         else:
             messagebox.showwarning("加载失败", f"存档槽 {slot} 为空")
 
@@ -833,7 +1625,8 @@ F3      读档槽1
 
     def restart_game(self):
         """重新开始游戏"""
-        self.player = HumanTrash()
+        self.player = Player()
+        self.player.quest_manager = QuestManager(self.player)
         self.displayed_actions = []
         self.timer_running = False
         self.time_left = 25
@@ -841,28 +1634,118 @@ F3      读档槽1
         self.debuff_active = False
         self.game_over = False
         self.rent_amount = 40
+        self.last_event_round = 0
 
         self.create_widgets()
+        # 重新开始时也初始化任务
+        self.player.quest_manager.check_new_quests()
+        self._update_quest_display()
         self.start_new_round()
 
     def refresh_display(self):
-        """刷新显示"""
+        """刷新显示所有属性"""
+        # 财务
         self.cash_var.set(max(0, self.player.cash))
+        self.bank_var.set(max(0, self.player.bank_balance))
+        self.debt_var.set(max(0, self.player.debt))
+
+        # 身体
         self.sober_var.set(max(0, min(100, self.player.sober)))
-        self.rep_var.set(max(0, min(100, self.player.reputation)))
+        self.health_var.set(max(0, min(100, self.player.health)))
         self.wd_var.set(max(0, min(100, self.player.withdrawal)))
+
+        # 精神
         self.anxiety_var.set(max(0, min(100, self.player.anxiety)))
         self.despair_var.set(max(0, min(100, self.player.despair)))
+        self.hope_var.set(max(0, min(100, self.player.hope)))
 
+        # 社交
+        self.rep_var.set(max(0, min(100, self.player.reputation)))
+        self.social_var.set(max(0, min(20, self.player.social_connections)))
+
+        # 更新数值标签
         self.cash_value_label.configure(text=f"£{self.player.cash}")
+        self.bank_value_label.configure(text=f"£{self.player.bank_balance}")
+        self.debt_value_label.configure(text=f"£{self.player.debt}")
         self.sober_value_label.configure(text=str(self.player.sober))
-        self.rep_value_label.configure(text=str(self.player.reputation))
+        self.health_value_label.configure(text=str(self.player.health))
         self.wd_value_label.configure(text=str(self.player.withdrawal))
         self.anxiety_value_label.configure(text=str(self.player.anxiety))
         self.despair_value_label.configure(text=str(self.player.despair))
+        self.hope_value_label.configure(text=str(self.player.hope))
+        self.rep_value_label.configure(text=str(self.player.reputation))
+        self.social_value_label.configure(text=str(self.player.social_connections))
+
+        # 更新进度条
+        self._update_bar(self.cash_bar, self.player.cash, 200, COLORS_EX['cash'])
+        self._update_bar(self.bank_bar, self.player.bank_balance, 1000, COLORS_EX['bank_balance'])
+        self._update_bar(self.debt_bar, self.player.debt, 500, COLORS_EX['debt'])
+        self._update_bar(self.sober_bar, self.player.sober, 100, COLORS_EX['sober'])
+        self._update_bar(self.health_bar, self.player.health, 100, COLORS_EX['health'])
+        self._update_bar(self.wd_bar, self.player.withdrawal, 100, COLORS_EX['withdrawal'])
+        self._update_bar(self.anxiety_bar, self.player.anxiety, 100, COLORS_EX['anxiety'])
+        self._update_bar(self.despair_bar, self.player.despair, 100, COLORS_EX['despair'])
+        self._update_bar(self.hope_bar, self.player.hope, 100, COLORS_EX['hope'])
+        self._update_bar(self.rep_bar, self.player.reputation, 100, COLORS_EX['reputation'])
+        self._update_bar(self.social_bar, self.player.social_connections, 20, COLORS_EX['social_connections'])
+
+        # 更新NPC关系显示
+        self._update_npc_display()
+
+        # 更新任务显示
+        self._update_quest_display()
 
         self.time_label.configure(text=f"第{self.player.day}天 {self.player.hour}:00")
         self.rent_label.configure(text=f"房租: £{self.rent_amount} | {self.player.rent_due}轮后到期")
+
+    def _update_bar(self, bar, value, max_val, color):
+        """更新进度条"""
+        progress = max(0, min(1, value / max_val))
+        bar.configure(bg=color)
+        bar.place_configure(relwidth=progress)
+
+    def _update_npc_display(self):
+        """更新NPC关系显示"""
+        lines = []
+        for npc_id, rel in self.player.relationships.items():
+            npc_def = NPC_DEFINITIONS.get(npc_id, {})
+            name = npc_def.get('name', npc_id)
+            state_icon = {'enemy': '😠', 'stranger': '❓', 'acquaintance': '🤝', 'friend': '😊', 'close_friend': '💕'}.get(rel.state, '❓')
+            lines.append(f"{state_icon}{name}: {rel.state} (好感{rel.affinity})")
+        self.npc_label.configure(text="\n".join(lines) if lines else "无")
+
+    def _update_quest_display(self):
+        """更新任务显示"""
+        if not self.player.quest_manager:
+            self.quest_label.configure(text="无进行中的任务")
+            return
+
+        active = self.player.quest_manager.active_quests
+        completed = self.player.quest_manager.completed_quests
+        lines = []
+
+        # 显示进行中的任务
+        if active:
+            for qid in active[:3]:  # 最多显示3个
+                quest = self.player.quest_manager.all_quests.get(qid)
+                if quest:
+                    lines.append(f"📋{quest.title}")
+                    for obj in quest.objectives:
+                        prog = obj.get('current', 0)
+                        tgt = obj.get('target', 1)
+                        lines.append(f"   ▸ {obj.get('description', '')} ({prog}/{tgt})")
+        else:
+            lines.append("无进行中的任务")
+
+        # 显示最近完成的任务
+        if completed:
+            recent = completed[-2:]  # 最近2个
+            for qid in recent:
+                quest = self.player.quest_manager.all_quests.get(qid)
+                if quest:
+                    lines.append(f"✅{quest.title}")
+
+        self.quest_label.configure(text="\n".join(lines))
 
     def create_widgets(self):
         # 先清除现有部件
@@ -882,6 +1765,7 @@ F3      读档槽1
                            font=("Courier", 10, "italic"), fg=GRAY, bg=BG_DARK)
         subtitle.pack()
 
+        # 顶部信息栏
         top_frame = tk.Frame(self.root, bg=BG_DARK)
         top_frame.pack(fill="x", padx=20)
 
@@ -897,87 +1781,150 @@ F3      读档槽1
                                     font=("Courier", 14, "bold"), fg=PURPLE, bg=BG_DARK)
         self.timer_label.pack(side="right", padx=20)
 
-        status_frame = tk.Frame(self.root, bg=BG_DARK, bd=1, relief="solid")
-        status_frame.pack(pady=5, padx=20, fill="x")
+        # 主内容区域 - 使用左右分栏
+        main_frame = tk.Frame(self.root, bg=BG_DARK)
+        main_frame.pack(fill="both", expand=True, padx=20)
+
+        # 左侧：状态面板
+        left_frame = tk.Frame(main_frame, bg=BG_DARK)
+        left_frame.pack(side="left", fill="y", padx=(0, 10))
 
         # 属性面板 - 使用更美观的进度条样式
+        status_frame = tk.Frame(left_frame, bg=BG_DARK, bd=1, relief="solid")
+        status_frame.pack(pady=5, fill="x")
+
         stats_container = tk.Frame(status_frame, bg=BG_LIGHT, bd=0, relief="flat")
         stats_container.pack(fill="x", padx=5, pady=5)
 
         # 创建自定义进度条样式
         def create_stat_bar(parent, label, icon, color, var, max_val=100):
             frame = tk.Frame(parent, bg=BG_LIGHT)
-            frame.pack(fill="x", pady=3)
+            frame.pack(fill="x", pady=2)
 
-            # 标签
-            tk.Label(frame, text=f"{icon} {label}", fg=color, bg=BG_LIGHT,
-                    width=10, anchor="w", font=("Courier New", 10, "bold")).pack(side="left")
+            tk.Label(frame, text=f"{icon}{label}", fg=color, bg=BG_LIGHT,
+                    width=10, anchor="w", font=("Courier New", 9, "bold")).pack(side="left")
 
-            # 进度条背景
-            bar_bg = tk.Frame(frame, bg="#1a1a1a", height=16)
+            bar_bg = tk.Frame(frame, bg="#1a1a1a", height=12)
             bar_bg.pack(side="left", fill="x", expand=True, padx=5)
             bar_bg.pack_propagate(False)
 
-            # 进度条前景
-            var.set(min(max_val, var.get()))
-            progress = var.get() / max_val
-            bar_fill = tk.Frame(bar_bg, bg=color, height=14)
+            var.set(min(max_val, max(0, var.get())))
+            progress = max(0, min(1, var.get() / max_val))
+            bar_fill = tk.Frame(bar_bg, bg=color, height=10)
             bar_fill.place(relx=0, rely=0.5, relwidth=progress, anchor="w")
             bar_fill.pack_propagate(False)
 
-            # 数值显示
             value_label = tk.Label(frame, text=str(var.get()), fg=color, bg=BG_LIGHT,
-                                  width=6, font=("Courier New", 10, "bold"))
+                                  width=5, font=("Courier New", 9, "bold"))
             value_label.pack(side="right")
 
             return var, bar_fill, value_label
 
-        # 现金
+        # ===== 财务维度 =====
+        tk.Label(stats_container, text="【财务】", fg=YELLOW, bg=BG_LIGHT,
+                font=("Courier New", 10, "bold")).pack(fill="x", pady=(5, 2))
+
         self.cash_var = tk.IntVar()
         self.cash_var.set(50)
         self.cash_var, self.cash_bar, self.cash_value_label = create_stat_bar(
-            stats_container, "现金", "💰", COLORS['cash'], self.cash_var, 200)
+            stats_container, "现金", "💰", COLORS_EX['cash'], self.cash_var, 200)
 
-        # 清醒度
+        self.bank_var = tk.IntVar()
+        self.bank_var.set(0)
+        self.bank_var, self.bank_bar, self.bank_value_label = create_stat_bar(
+            stats_container, "银行存款", "🏦", COLORS_EX['bank_balance'], self.bank_var, 1000)
+
+        self.debt_var = tk.IntVar()
+        self.debt_var.set(0)
+        self.debt_var, self.debt_bar, self.debt_value_label = create_stat_bar(
+            stats_container, "债务", "⚠️", COLORS_EX['debt'], self.debt_var, 500)
+
+        # ===== 身体健康维度 =====
+        tk.Label(stats_container, text="【身体】", fg=ORANGE, bg=BG_LIGHT,
+                font=("Courier New", 10, "bold")).pack(fill="x", pady=(5, 2))
+
         self.sober_var = tk.IntVar()
         self.sober_var.set(60)
         self.sober_var, self.sober_bar, self.sober_value_label = create_stat_bar(
-            stats_container, "清醒度", "🧠", COLORS['sober'], self.sober_var, 100)
+            stats_container, "清醒度", "🧠", COLORS_EX['sober'], self.sober_var, 100)
 
-        # 信誉
-        self.rep_var = tk.IntVar()
-        self.rep_var.set(40)
-        self.rep_var, self.rep_bar, self.rep_value_label = create_stat_bar(
-            stats_container, "信誉", "👥", COLORS['reputation'], self.rep_var, 100)
+        self.health_var = tk.IntVar()
+        self.health_var.set(80)
+        self.health_var, self.health_bar, self.health_value_label = create_stat_bar(
+            stats_container, "健康", "❤️", COLORS_EX['health'], self.health_var, 100)
 
-        # 戒断值
         self.wd_var = tk.IntVar()
         self.wd_var.set(20)
         self.wd_var, self.wd_bar, self.wd_value_label = create_stat_bar(
-            stats_container, "戒断值", "💉", COLORS['withdrawal'], self.wd_var, 100)
+            stats_container, "戒断值", "💉", COLORS_EX['withdrawal'], self.wd_var, 100)
 
-        # 焦虑
+        # ===== 精神健康维度 =====
+        tk.Label(stats_container, text="【精神】", fg=CYAN, bg=BG_LIGHT,
+                font=("Courier New", 10, "bold")).pack(fill="x", pady=(5, 2))
+
         self.anxiety_var = tk.IntVar()
         self.anxiety_var.set(90)
         self.anxiety_var, self.anxiety_bar, self.anxiety_value_label = create_stat_bar(
-            stats_container, "焦虑", "😰", COLORS['anxiety'], self.anxiety_var, 100)
+            stats_container, "焦虑", "😰", COLORS_EX['anxiety'], self.anxiety_var, 100)
 
-        # 绝望
         self.despair_var = tk.IntVar()
         self.despair_var.set(50)
         self.despair_var, self.despair_bar, self.despair_value_label = create_stat_bar(
-            stats_container, "绝望", "💀", COLORS['despair'], self.despair_var, 100)
+            stats_container, "绝望", "💀", COLORS_EX['despair'], self.despair_var, 100)
+
+        self.hope_var = tk.IntVar()
+        self.hope_var.set(30)
+        self.hope_var, self.hope_bar, self.hope_value_label = create_stat_bar(
+            stats_container, "希望", "✨", COLORS_EX['hope'], self.hope_var, 100)
+
+        # ===== 社交维度 =====
+        tk.Label(stats_container, text="【社交】", fg=GREEN, bg=BG_LIGHT,
+                font=("Courier New", 10, "bold")).pack(fill="x", pady=(5, 2))
+
+        self.rep_var = tk.IntVar()
+        self.rep_var.set(40)
+        self.rep_var, self.rep_bar, self.rep_value_label = create_stat_bar(
+            stats_container, "信誉", "👥", COLORS_EX['reputation'], self.rep_var, 100)
+
+        self.social_var = tk.IntVar()
+        self.social_var.set(2)
+        self.social_var, self.social_bar, self.social_value_label = create_stat_bar(
+            stats_container, "社交", "🤝", COLORS_EX['social_connections'], self.social_var, 20)
+
+        # NPC关系面板
+        npc_frame = tk.Frame(left_frame, bg=BG_DARK, bd=1, relief="solid")
+        npc_frame.pack(pady=5, fill="x")
+        tk.Label(npc_frame, text="【人物关系】", fg=PURPLE, bg=BG_DARK,
+                font=("Courier New", 10, "bold")).pack(pady=2)
+
+        self.npc_label = tk.Label(npc_frame, text="", fg=GRAY, bg=BG_DARK,
+                font=("Courier", 9), justify="left", anchor="nw")
+        self.npc_label.pack(padx=5, pady=2)
+
+        # 任务面板
+        quest_frame = tk.Frame(left_frame, bg=BG_DARK, bd=1, relief="solid")
+        quest_frame.pack(pady=5, fill="x")
+        tk.Label(quest_frame, text="【当前任务】", fg=YELLOW, bg=BG_DARK,
+                font=("Courier New", 10, "bold")).pack(pady=2)
+
+        self.quest_label = tk.Label(quest_frame, text="无进行中的任务",
+                fg=GRAY, bg=BG_DARK, font=("Courier", 9), justify="left", anchor="nw")
+        self.quest_label.pack(padx=5, pady=2)
+
+        # 右侧：游戏内容
+        right_frame = tk.Frame(main_frame, bg=BG_DARK)
+        right_frame.pack(side="right", fill="both", expand=True)
 
         # 场景描述
-        self.scene_label = tk.Label(self.root, text="", font=("Courier", 11),
-                                    fg=GRAY, bg=BG_DARK, wraplength=850, justify="left")
+        self.scene_label = tk.Label(right_frame, text="", font=("Courier", 11),
+                                    fg=GRAY, bg=BG_DARK, wraplength=700, justify="left")
         self.scene_label.pack(pady=5)
 
-        self.hint_label = tk.Label(self.root, text="按 1-6 选择 | 25秒倒计时",
+        self.hint_label = tk.Label(right_frame, text="按 1-6 选择 | 25秒倒计时",
                                    font=("Courier", 10, "italic"), fg=DARK_GRAY, bg=BG_DARK)
         self.hint_label.pack()
 
-        self.options_frame = tk.Frame(self.root, bg=BG_DARK)
+        self.options_frame = tk.Frame(right_frame, bg=BG_DARK)
         self.options_frame.pack(pady=5)
 
         self.option_buttons = []
@@ -989,19 +1936,19 @@ F3      读档槽1
             btn.pack(pady=1, fill="x")
             self.option_buttons.append(btn)
 
-        # 结果文本区域 - 不自动换行，水平滚动
-        self.result_label = tk.Label(self.root, text="",
+        # 结果文本区域
+        self.result_label = tk.Label(right_frame, text="",
                                      fg="#FFA500", bg=BG_DARK,
                                      font=("Courier", 11), justify="left", anchor="nw")
         self.result_label.pack(pady=5, fill="both", padx=10, expand=True)
 
         # 事件文本区域
-        self.event_label = tk.Label(self.root, text="",
+        self.event_label = tk.Label(right_frame, text="",
                                     fg="#FFA500", bg=BG_DARK,
                                     font=("Courier", 10), justify="left", anchor="nw")
         self.event_label.pack(pady=5, fill="both", padx=10, expand=True)
 
-        control_frame = tk.Frame(self.root, bg=BG_DARK)
+        control_frame = tk.Frame(right_frame, bg=BG_DARK)
         control_frame.pack(pady=10)
 
         self.music_btn = tk.Button(control_frame, text="🎵 音乐: 开",
@@ -1010,7 +1957,7 @@ F3      读档槽1
         self.music_btn.pack(side="left", padx=5)
         self.music_on = True
 
-        self.continue_btn = tk.Button(control_frame, text="【按回车继续】",
+        self.continue_btn = tk.Button(control_frame, text="【点击继续】",
                                        font=("Courier", 14, "bold"), fg="white", bg="#8B0000",
                                        command=self.next_round, state="disabled", width=25, height=2)
         self.continue_btn.pack(side="left", padx=5)
@@ -1146,34 +2093,8 @@ F3      读档槽1
             self.show_ending("debt")
 
     def update_status(self):
-        # 更新变量值
-        self.cash_var.set(max(0, self.player.cash))
-        self.sober_var.set(max(0, min(100, self.player.sober)))
-        self.rep_var.set(max(0, min(100, self.player.reputation)))
-        self.wd_var.set(max(0, min(100, self.player.withdrawal)))
-        self.anxiety_var.set(max(0, min(100, self.player.anxiety)))
-        self.despair_var.set(max(0, min(100, self.player.despair)))
-
-        # 更新数值标签
-        self.cash_value_label.configure(text=f"£{self.player.cash}")
-        self.sober_value_label.configure(text=str(self.player.sober))
-        self.rep_value_label.configure(text=str(self.player.reputation))
-        self.wd_value_label.configure(text=str(self.player.withdrawal))
-        self.anxiety_value_label.configure(text=str(self.player.anxiety))
-        self.despair_value_label.configure(text=str(self.player.despair))
-
-        # 更新进度条颜色和宽度
-        def update_bar(bar, value, max_val, color):
-            progress = max(0, min(1, value / max_val))
-            bar.configure(bg=color)
-            bar.place_configure(relwidth=progress)
-
-        update_bar(self.cash_bar, self.player.cash, 200, COLORS['cash'])
-        update_bar(self.sober_bar, self.player.sober, 100, COLORS['sober'])
-        update_bar(self.rep_bar, self.player.reputation, 100, COLORS['reputation'])
-        update_bar(self.wd_bar, self.player.withdrawal, 100, COLORS['withdrawal'])
-        update_bar(self.anxiety_bar, self.player.anxiety, 100, COLORS['anxiety'])
-        update_bar(self.despair_bar, self.player.despair, 100, COLORS['despair'])
+        """更新状态显示 - 使用统一的refresh_display"""
+        self.refresh_display()
 
     def make_choice(self, idx):
         try:
@@ -1306,6 +2227,11 @@ F3      读档槽1
 
             self.root.update_idletasks()
             self.trigger_events()
+
+            # 更新任务进度
+            if self.player.quest_manager:
+                self.player.quest_manager.update_quest_progress(action_id=action_id)
+
             self.update_status()
 
             if self.player.reputation < 20:
@@ -1332,43 +2258,72 @@ F3      读档槽1
         """解析形如 '清醒度-15' 或 'money+20' 的字符串"""
         if not stat_str or not isinstance(stat_str, str):
             return None
+        # 中文到英文的属性名映射
+        stat_map = {
+            '清醒度': 'sober', '信誉': 'reputation', 'money': 'cash',
+            '戒断值': 'withdrawal', '焦虑': 'anxiety', '绝望': 'despair',
+            '健康': 'health', '希望': 'hope', '社交': 'social_connections',
+            '影响力': 'influence', '银行存款': 'bank_balance', '债务': 'debt'
+        }
         # 找到 +/- 的位置
         for i, char in enumerate(stat_str):
             if char in '+-':
                 stat_name = stat_str[:i]
                 try:
                     val = int(stat_str[i:])
-                    return (stat_name, val)
+                    # 转换为英文属性名
+                    mapped_stat = stat_map.get(stat_name, stat_name)
+                    return (mapped_stat, val)
                 except ValueError:
                     return None
         return None
 
     def apply_effect(self, stat, val):
-        if stat == "money":
-            self.player.cash = max(0, self.player.cash + val)
-        elif stat == "清醒度":
-            self.player.sober = max(0, min(100, self.player.sober + val))
-        elif stat == "信誉":
-            self.player.reputation = max(0, min(100, self.player.reputation + val))
-        elif stat == "戒断值":
-            self.player.withdrawal = max(0, min(100, self.player.withdrawal + val))
-        elif stat == "焦虑":
-            self.player.anxiety = max(0, min(100, self.player.anxiety + val))
-        elif stat == "绝望":
-            self.player.despair = max(0, min(100, self.player.despair + val))
+        """委托给Player的apply_effect方法"""
+        self.player.apply_effect(stat, val)
 
     def trigger_events(self):
-        if random.random() < 0.4:
-            if random.random() < 0.8:
+        """触发事件 - 整合新的事件系统"""
+        # 先检查确定性剧情事件
+        for event_id, event in STORY_EVENTS.items():
+            if event_id not in self.player.triggered_events:
+                if event.can_trigger(self.player, self.player.round):
+                    narrative = event.trigger(self.player)
+                    self.player.triggered_events.add(event_id)
+                    # 设置事件对应的故事标志
+                    event_flags = {
+                        'mark_appears': 'owed_mark',
+                    }
+                    if event_id in event_flags:
+                        self.player.story_flags[event_flags[event_id]] = True
+                    self.event_label.configure(text=self.event_label.cget("text") + f"\n✞ {narrative} ✞")
+                    return
+
+        # 检查任务进度相关事件
+        if self.player.quest_manager:
+            self.player.quest_manager.check_failures()
+            self.player.quest_manager.check_new_quests()
+            self._update_quest_display()  # 刷新任务面板
+
+        # 随机事件概率降低到15%
+        if random.random() < 0.15:
+            if random.random() < 0.85:
                 event = random.choice(BASIC_EVENTS)
             else:
                 event = random.choice(HEAVY_EVENTS)
-                self.apply_effect("清醒度", -15)
-                self.apply_effect("绝望", 10)
+                self.player.apply_effect('sober', -15)
+                self.player.apply_effect('despair', 10)
             event_text = event[0]
             self.event_label.configure(text=self.event_label.cget("text") + f"\n✞ {event_text} ✞")
             if len(event) >= 4:
-                self.apply_effect(event[2], event[3])
+                stat = event[2] if isinstance(event[2], str) else None
+                val = event[3] if len(event) > 3 else None
+                if stat and val is not None:
+                    # 映射旧属性名到新属性名
+                    stat_map = {'清醒度': 'sober', '信誉': 'reputation', 'money': 'cash',
+                               '戒断值': 'withdrawal', '焦虑': 'anxiety', '绝望': 'despair'}
+                    new_stat = stat_map.get(stat, stat)
+                    self.player.apply_effect(new_stat, val)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # 特殊互动处理器
@@ -1383,14 +2338,18 @@ F3      读档槽1
             self.player.cash += 50
             self.player.reputation += 20
             self.player.despair -= 20
+            self.player.story_flags['called_parents_home'] = True  # 标记：表示想回家
         elif choice == "2":
             self.result_label.configure(text="► 你选择了：给父母打电话\n\n父亲在电话那头咆哮:\n'你还有脸跟我们要钱?!'\n\n他把电话挂了。")
             self.player.reputation -= 15
             self.player.despair += 10
+            self.player.story_flags['asked_parents_for_money'] = True  # 标记：被父母拒绝
         elif choice == "3":
             self.result_label.configure(text="► 你选择了：给父母打电话\n\n母亲哽咽着说:\n'儿子，妈想你了...'\n\n她悄悄给你转了£30。")
             self.player.cash += 30
             self.player.reputation += 10
+            self.player.despair -= 10
+            self.player.story_flags['reconnected_with_mother'] = True  # 标记：与母亲和解
             self.player.despair -= 10
         else:
             self.result_label.configure(text="► 你选择了：给父母打电话\n\n你犹豫了一下，还是把电话挂了。")
@@ -1406,6 +2365,10 @@ F3      读档槽1
             self.result_label.configure(text="► 你选择了：给Diane发短信\n\nDiane很快回复:\n'你在开什么玩笑? 我们已经结束了。'\n\n她把你拉黑了。")
             self.player.reputation -= 20
             self.player.despair += 15
+            diane_rel = self.player.relationships.get('diane')
+            if diane_rel:
+                diane_rel.affinity = max(0, diane_rel.affinity - 15)
+                update_relationship_state(diane_rel)
         elif choice == "2":
             self.result_label.configure(text="► 你选择了：给Diane发短信\n\nDiane过了很久回复:\n'我现在很忙。'\n\n你知道她只是不想见你。")
             self.player.despair += 5
@@ -1413,6 +2376,14 @@ F3      读档槽1
             self.result_label.configure(text="► 你选择了：给Diane发短信\n\nDiane回了:\n'我考虑考虑...'\n\n第二天她给你转了£20。")
             self.player.cash += 20
             self.player.reputation += 10
+            diane_rel = self.player.relationships.get('diane')
+            if diane_rel:
+                diane_rel.affinity += 10
+                diane_rel.positive_interactions += 1
+                update_relationship_state(diane_rel)
+                # 更新任务进度
+                if self.player.quest_manager:
+                    self.player.quest_manager.update_quest_progress(choice_id='diane_reconnect')
         else:
             self.result_label.configure(text="► 你选择了：给Diane发短信\n\n你最终还是没有发送。")
 
@@ -1423,22 +2394,43 @@ F3      读档槽1
             "Sick Boy接起电话:\n'哟，找我啥事?'\n1. 有好货吗?\n2. 有什么来钱的活吗?\n3. 没什么，挂了啊\n输入 1, 2 或 3:",
             parent=self.root)
 
+        sick_boy_rel = self.player.relationships.get('sick_boy')
+
         if choice == "1":
             self.result_label.configure(text="► 你选择了：给Sick Boy打电话\n\nSick Boy说: '有啊，最新的货，£30'\n\n你买了一包...结果发现是面粉。")
             self.player.cash -= 30
             self.player.withdrawal += 20
             self.player.despair += 10
+            if sick_boy_rel:
+                sick_boy_rel.affinity -= 5
+                update_relationship_state(sick_boy_rel)
         elif choice == "2":
             self.result_label.configure(text="► 你选择了：给Sick Boy打电话\n\nSick Boy淫笑:\n'有个好活，帮我送点货，给你 £50'")
-            if random.random() < 0.6:
+            # 成功率基于好感度和信任
+            success_rate = 0.4
+            if sick_boy_rel:
+                success_rate += sick_boy_rel.affinity / 200  # 好感度加成
+                success_rate += sick_boy_rel.trust / 200  # 信任度加成
+            if random.random() < success_rate:
                 self.result_label.configure(text=self.result_label.cget("text") + "\n\n你成功完成了送货!\nSick Boy给了你 £50!")
                 self.player.cash += 50
                 self.player.reputation += 15
+                if sick_boy_rel:
+                    sick_boy_rel.affinity += 10
+                    sick_boy_rel.trust += 5
+                    update_relationship_state(sick_boy_rel)
             else:
                 self.result_label.configure(text=self.result_label.cget("text") + "\n\n警察! 你拔腿就跑!\n好不容 易逃脱，但钱没拿到。")
                 self.player.despair += 10
+                if sick_boy_rel:
+                    sick_boy_rel.affinity -= 10
+                    update_relationship_state(sick_boy_rel)
         else:
             self.result_label.configure(text="► 你选择了：给Sick Boy打电话\n\nSick Boy骂了一句就挂了。")
+
+        # 更新任务进度
+        if self.player.quest_manager:
+            self.player.quest_manager.update_quest_progress(npc_id='sick_boy')
 
         self.finish_turn()
 
@@ -1447,18 +2439,45 @@ F3      读档槽1
             "Mark接起电话:\n'干啥?'\n1. Mark，借我点钱...\n2. 我想见见你...\n3. 打错了\n输入 1, 2 或 3:",
             parent=self.root)
 
+        mark_rel = self.player.relationships.get('mark')
+        if mark_rel:
+            mark_rel.has_met = True
+            mark_rel.interaction_count += 1
+
         if choice == "1":
-            self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark沉默了一下:\n'...等着，我给你转点'\n\n他给你转了£20")
-            self.player.cash += 20
-            self.player.reputation += 5
+            # Mark是否愿意借钱取决于关系
+            if mark_rel and mark_rel.state in ['friend', 'close_friend']:
+                self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark沉默了一下:\n'...等着，我给你转点'\n\n他给你转了£30 (看在朋友的份上)")
+                self.player.cash += 30
+                self.player.reputation += 10
+                mark_rel.affinity += 5
+                mark_rel.trust += 5
+            elif mark_rel and mark_rel.state == 'acquaintance':
+                self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark哼了一声:\n'行吧，这次帮你一把'\n\n他给你转了£15")
+                self.player.cash += 15
+                mark_rel.affinity += 5
+            else:
+                self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark冷笑:\n'借钱? 你还欠我的呢!'\n\n他挂了电话。")
+                self.player.despair += 10
+                if mark_rel:
+                    mark_rel.affinity -= 10
+                    update_relationship_state(mark_rel)
         elif choice == "2":
-            if random.random() < 0.5:
+            if mark_rel and mark_rel.state in ['friend', 'close_friend']:
+                self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark说在老地方酒吧等你\n\n你去了，他请你喝了一杯。")
+                self.player.sober -= 15
+                mark_rel.affinity += 5
+            elif random.random() < 0.5:
                 self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark说在老地方酒吧等你\n\n你去了，他请你喝了一杯。")
                 self.player.sober -= 15
             else:
                 self.result_label.configure(text="► 你选择了：给Mark打电话\n\nMark说他很忙...\n\n你知道他在躲你。")
         else:
             self.result_label.configure(text="► 你选择了：给Mark打电话\n\n你快速挂断了电话。\n\n手在颤抖。")
+
+        # 更新任务进度
+        if self.player.quest_manager:
+            self.player.quest_manager.update_quest_progress(npc_id='mark')
 
         self.finish_turn()
 
@@ -1467,16 +2486,32 @@ F3      读档槽1
             "你知道Renton在伦敦...\n1. 给他写信\n2. 打电话给他\n3. 算了吧\n输入 1, 2 或 3:",
             parent=self.root)
 
+        renton_rel = self.player.relationships.get('renton')
+        if renton_rel:
+            renton_rel.has_met = True
+            renton_rel.interaction_count += 1
+
         if choice == "1":
             self.result_label.configure(text="► 你选择了：联系Renton\n\n你写了一封很长的信...\n\n一周后你收到了回信:\n'Renton... 我现在不太好... £30 是我最后的帮助了...'")
             self.player.cash += 30
             self.player.despair -= 15
+            if renton_rel:
+                renton_rel.affinity += 10
+                renton_rel.positive_interactions += 1
+                update_relationship_state(renton_rel)
         elif choice == "2":
             self.result_label.configure(text="► 你选择了：联系Renton\n\n电话通了...\n\n'Renton?'\n\n然后是一阵忙音。\n\n他可能已经换号了。")
             self.player.despair += 10
+            if renton_rel:
+                renton_rel.affinity -= 5
+                update_relationship_state(renton_rel)
         else:
             self.result_label.configure(text="► 你选择了：联系Renton\n\n你放弃了。\n\n也许他早就把你忘了。")
             self.player.despair += 5
+
+        # 更新任务进度
+        if self.player.quest_manager:
+            self.player.quest_manager.update_quest_progress(npc_id='renton')
 
         self.finish_turn()
 
@@ -1917,7 +2952,7 @@ F3      读档槽1
         )
 
         if reply:
-            self.player = HumanTrash()
+            self.player = Player()
             self.game_over = False
             self.debuff_active = False
             self.start_new_round()
